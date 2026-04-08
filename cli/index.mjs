@@ -16,7 +16,7 @@ import { homedir } from "node:os";
 import { exec } from "node:child_process";
 import { WebSocketServer } from "ws";
 
-const APP_URL = "https://vibetalkes.com";
+const APP_URL = "https://vibedrop.pro/app";
 const PORT = 3009;
 const VERSION = "0.1.0";
 
