@@ -54,7 +54,7 @@ function HeroAnimation({ started }: { started: boolean }) {
   return (
     <div className="w-full h-full flex items-stretch justify-center p-3">
       <AnimatePresence mode="wait">
-        {/* Idle / Dropping — skeleton with street sign physics */}
+        {/* Idle / Dropping — clean flat illustration */}
         {step === "idle" && (
           <motion.div
             key="idle"
@@ -79,12 +79,15 @@ function HeroAnimation({ started }: { started: boolean }) {
                 scale: { type: "spring", stiffness: 100, damping: 15, mass: 3 },
               } : {}}
             >
-              {/* Figma-matched placeholder */}
               <div
-                className="w-full h-full relative"
-                style={{ background: "color(display-p3 0.988 0.341 0)", borderRadius: "24px 28px 28px 24px", overflow: "hidden" }}
+                className="w-full h-full relative rounded-2xl overflow-hidden"
+                style={{
+                  background: "color(display-p3 0.988 0.341 0)",
+                  WebkitMaskImage: "-webkit-radial-gradient(white, black)",
+                  maskImage: "radial-gradient(white, black)",
+                }}
               >
-                {/* Gradient pill 1 */}
+                {/* Warm glow — top right */}
                 <motion.div
                   initial={{ opacity: 0, scale: 0.8 }}
                   animate={{ opacity: 0.7, scale: 1 }}
@@ -93,26 +96,23 @@ function HeroAnimation({ started }: { started: boolean }) {
                   style={{
                     top: "-30%", right: "-20%", width: "130%", height: "75%",
                     borderRadius: "45%", transform: "rotate(-30deg)",
-                    background: "linear-gradient(135deg, color(display-p3 1 0.737 0.6), color(display-p3 1 0.463 0.18))",
+                    background: "color(display-p3 1 0.6 0.35)",
                     filter: "blur(100px)", zIndex: 1,
                   }}
                 />
 
-                {/* Blur SVG shape — sits behind panels 1-3, affects panel 4 */}
+                {/* Blur SVG shape */}
                 <motion.img
                   src="/blur-shape.svg"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 0.6 }}
                   transition={{ duration: 1.5, delay: 0.8 }}
                   className="absolute pointer-events-none"
-                  style={{
-                    top: "10%", left: "30%", width: "120%", height: "90%",
-                    zIndex: 3,
-                  }}
+                  style={{ top: "10%", left: "30%", width: "120%", height: "90%", zIndex: 3 }}
                   alt=""
                 />
 
-                {/* 4 Glass panels — slide from top, then infinite train loop */}
+                {/* 4 Glass panels — slide from top */}
                 {[
                   { left: "49.6%", delay: 0.15, z: 4 },
                   { left: "61.7%", delay: 0.3, z: 5 },
@@ -133,12 +133,9 @@ function HeroAnimation({ started }: { started: boolean }) {
                       background: "color(display-p3 0.918 0.914 0.914 / 0.3)",
                       backdropFilter: "blur(28px)", WebkitBackdropFilter: "blur(28px)",
                       borderBottomLeftRadius: 48,
-                      borderTopRightRadius: i === 3 ? 28 : 0,
-                      borderBottomRightRadius: i === 3 ? 28 : 0,
                       zIndex: panel.z,
                     }}
                   >
-                    {/* Infinite train — panels continuously drift inward */}
                     <motion.div
                       className="absolute inset-0"
                       animate={{ x: [0, -(12 + i * 4), 0] }}
@@ -152,7 +149,7 @@ function HeroAnimation({ started }: { started: boolean }) {
                   </motion.div>
                 ))}
 
-                {/* Gradient pill 2 — bottom */}
+                {/* Warm glow — bottom left */}
                 <motion.div
                   initial={{ opacity: 0, scale: 0.8 }}
                   animate={{ opacity: 0.5, scale: 1 }}
@@ -161,7 +158,7 @@ function HeroAnimation({ started }: { started: boolean }) {
                   style={{
                     bottom: "-15%", left: "-10%", width: "100%", height: "65%",
                     borderRadius: "45%", transform: "rotate(-25deg)",
-                    background: "linear-gradient(135deg, color(display-p3 0.984 0.867 0.796), color(display-p3 0.949 0.506 0.231))",
+                    background: "color(display-p3 0.95 0.5 0.23)",
                     filter: "blur(110px)", zIndex: 1,
                   }}
                 />
