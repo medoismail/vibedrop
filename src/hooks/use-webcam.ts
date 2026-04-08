@@ -21,6 +21,26 @@ export function useWebcam() {
     } catch {}
   }, []);
 
+  // Attach stream to video element — retries until the element is available
+  // (handles AnimatePresence delayed mount)
+  const attachStream = useCallback((mediaStream: MediaStream) => {
+    if (videoRef.current) {
+      videoRef.current.srcObject = mediaStream;
+      return;
+    }
+    // Video element not mounted yet — poll until it appears
+    let attempts = 0;
+    const interval = setInterval(() => {
+      attempts++;
+      if (videoRef.current) {
+        videoRef.current.srcObject = mediaStream;
+        clearInterval(interval);
+      } else if (attempts > 20) {
+        clearInterval(interval);
+      }
+    }, 50);
+  }, []);
+
   const startWithDevices = useCallback(
     async (audioId?: string, videoId?: string) => {
       try {
@@ -36,9 +56,7 @@ export function useWebcam() {
         });
         streamRef.current = newStream;
         setStream(newStream);
-        if (videoRef.current) {
-          videoRef.current.srcObject = newStream;
-        }
+        attachStream(newStream);
         setIsActive(true);
         setIsMuted(false);
         setIsCamOff(false);
@@ -66,7 +84,7 @@ export function useWebcam() {
         setIsActive(false);
       }
     },
-    [enumerateDevices]
+    [enumerateDevices, attachStream]
   );
 
   const start = useCallback(() => {
