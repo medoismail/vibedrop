@@ -278,97 +278,167 @@ export function VideoChat({ elapsed }: Props) {
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ duration: 0.35, delay: 0.08, ease: EASE_OUT }}
-                className="absolute bottom-[180px] right-4 w-52 h-40 rounded-xl overflow-hidden bg-surface z-10"
-                style={{ boxShadow: "var(--shadow-lg)" }}
+                className="absolute bottom-[180px] right-4 w-52 z-10 flex flex-col gap-1.5"
               >
-                {error ? (
-                  <div className="w-full h-full flex flex-col items-center justify-center gap-1.5 bg-neutral-100">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-text-placeholder">
-                      <path d="M23 7l-7 5 7 5V7z" />
-                      <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
-                      <line x1="1" y1="1" x2="23" y2="23" />
-                    </svg>
-                    <button
-                      onClick={start}
-                      className="text-[9px] text-accent-500 font-medium cursor-pointer"
-                    >
-                      Enable camera
-                    </button>
-                  </div>
-                ) : (
-                  <>
-                    <video
-                      ref={videoRef}
-                      autoPlay
-                      playsInline
-                      muted
-                      className={`w-full h-full object-cover transition-opacity duration-200 ${isCamOff ? "opacity-0" : ""}`}
-                      style={{ transform: "scaleX(-1)" }}
-                    />
-                    {isCamOff && (
-                      <div className="absolute inset-0 flex items-center justify-center bg-neutral-100">
-                        <span className="text-[10px] text-text-muted">Camera off</span>
-                      </div>
-                    )}
-                  </>
-                )}
-
-                {/* You label */}
+                {/* Video preview */}
                 <div
-                  className="absolute bottom-1.5 left-1.5 flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface/90 backdrop-blur-sm"
-                  style={{ boxShadow: "var(--shadow-xs)" }}
+                  className="relative w-full h-40 rounded-xl overflow-hidden bg-surface"
+                  style={{ boxShadow: "var(--shadow-lg)" }}
                 >
-                  <div className="w-1 h-1 rounded-full bg-success" />
-                  <span className="text-[9px] font-semibold text-text-secondary">You</span>
+                  {error ? (
+                    <div className="w-full h-full flex flex-col items-center justify-center gap-1.5 bg-neutral-100">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-text-placeholder">
+                        <path d="M23 7l-7 5 7 5V7z" />
+                        <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
+                        <line x1="1" y1="1" x2="23" y2="23" />
+                      </svg>
+                      <span className="text-[9px] text-error font-medium px-2 text-center">{error}</span>
+                      <button
+                        onClick={start}
+                        className="text-[9px] text-accent-500 font-medium cursor-pointer underline"
+                      >
+                        Retry
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <video
+                        ref={videoRef}
+                        autoPlay
+                        playsInline
+                        muted
+                        onLoadedMetadata={(e) => (e.target as HTMLVideoElement).play().catch(() => {})}
+                        className={`w-full h-full object-cover transition-opacity duration-200 ${isCamOff ? "opacity-0" : ""}`}
+                        style={{ transform: "scaleX(-1)" }}
+                      />
+                      {isCamOff && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-neutral-100">
+                          <span className="text-[10px] text-text-muted">Camera off</span>
+                        </div>
+                      )}
+                    </>
+                  )}
+
+                  {/* You label */}
+                  <div
+                    className="absolute bottom-1.5 left-1.5 flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface/90 backdrop-blur-sm"
+                    style={{ boxShadow: "var(--shadow-xs)" }}
+                  >
+                    <div className="w-1 h-1 rounded-full bg-success" />
+                    <span className="text-[9px] font-semibold text-text-secondary">You</span>
+                  </div>
                 </div>
 
-                {/* Mic/cam toggles */}
-                <div className="absolute bottom-1.5 right-1.5 flex items-center gap-1">
+                {/* Controls bar — mic, cam, device selector */}
+                <div
+                  className="relative flex items-center justify-between px-2 py-1.5 rounded-xl bg-surface"
+                  style={{ boxShadow: "var(--shadow-ring), var(--shadow-sm)" }}
+                >
+                  <div className="flex items-center gap-1">
+                    {/* Mic toggle */}
+                    <motion.button
+                      onClick={toggleMic}
+                      whileTap={{ scale: 0.85 }}
+                      className={`w-7 h-7 rounded-lg flex items-center justify-center cursor-pointer transition-colors ${isMuted ? "bg-error/90 text-white" : "bg-neutral-100 text-text-secondary hover:bg-neutral-200"}`}
+                      aria-label={isMuted ? "Unmute" : "Mute"}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        {isMuted ? (
+                          <>
+                            <line x1="1" y1="1" x2="23" y2="23" />
+                            <path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6" />
+                            <path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2c0 .76-.12 1.5-.35 2.18" />
+                          </>
+                        ) : (
+                          <>
+                            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+                            <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                          </>
+                        )}
+                      </svg>
+                    </motion.button>
+
+                    {/* Cam toggle */}
+                    <motion.button
+                      onClick={toggleCam}
+                      whileTap={{ scale: 0.85 }}
+                      className={`w-7 h-7 rounded-lg flex items-center justify-center cursor-pointer transition-colors ${isCamOff ? "bg-error/90 text-white" : "bg-neutral-100 text-text-secondary hover:bg-neutral-200"}`}
+                      aria-label={isCamOff ? "Camera on" : "Camera off"}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        {isCamOff ? (
+                          <>
+                            <path d="M23 7l-7 5 7 5V7z" />
+                            <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
+                            <line x1="1" y1="1" x2="23" y2="23" />
+                          </>
+                        ) : (
+                          <>
+                            <path d="M23 7l-7 5 7 5V7z" />
+                            <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
+                          </>
+                        )}
+                      </svg>
+                    </motion.button>
+                  </div>
+
+                  {/* Device selector button */}
                   <motion.button
-                    onClick={toggleMic}
-                    whileTap={{ scale: 0.85 }}
-                    className={`w-6 h-6 rounded-full flex items-center justify-center cursor-pointer transition-colors ${isMuted ? "bg-error/90 text-white" : "bg-surface/90 text-text-secondary"} backdrop-blur-sm`}
-                    style={{ boxShadow: "var(--shadow-xs)" }}
-                    aria-label={isMuted ? "Unmute" : "Mute"}
+                    onClick={() => setShowDeviceMenu((v) => !v)}
+                    whileTap={{ scale: 0.9 }}
+                    className={`w-7 h-7 rounded-lg flex items-center justify-center cursor-pointer transition-colors ${showDeviceMenu ? "bg-accent-500/15 text-accent-500" : "bg-neutral-100 text-text-muted hover:bg-neutral-200"}`}
+                    aria-label="Change devices"
                   >
-                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      {isMuted ? (
-                        <>
-                          <line x1="1" y1="1" x2="23" y2="23" />
-                          <path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6" />
-                          <path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2c0 .76-.12 1.5-.35 2.18" />
-                        </>
-                      ) : (
-                        <>
-                          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
-                          <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-                        </>
-                      )}
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="3" />
+                      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
                     </svg>
                   </motion.button>
 
-                  <motion.button
-                    onClick={toggleCam}
-                    whileTap={{ scale: 0.85 }}
-                    className={`w-6 h-6 rounded-full flex items-center justify-center cursor-pointer transition-colors ${isCamOff ? "bg-error/90 text-white" : "bg-surface/90 text-text-secondary"} backdrop-blur-sm`}
-                    style={{ boxShadow: "var(--shadow-xs)" }}
-                    aria-label={isCamOff ? "Camera on" : "Camera off"}
-                  >
-                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      {isCamOff ? (
-                        <>
-                          <path d="M23 7l-7 5 7 5V7z" />
-                          <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
-                          <line x1="1" y1="1" x2="23" y2="23" />
-                        </>
-                      ) : (
-                        <>
-                          <path d="M23 7l-7 5 7 5V7z" />
-                          <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
-                        </>
-                      )}
-                    </svg>
-                  </motion.button>
+                  {/* Device dropdown — pops up from controls */}
+                  <AnimatePresence>
+                    {showDeviceMenu && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 4 }}
+                        transition={{ duration: 0.15, ease: EASE_OUT }}
+                        className="absolute bottom-full right-0 mb-1.5 w-64 bg-surface rounded-xl p-3 flex flex-col gap-3 z-20"
+                        style={{ boxShadow: "var(--shadow-lg)" }}
+                      >
+                        <div className="flex flex-col gap-1.5">
+                          <span className="text-[10px] font-semibold text-text-secondary uppercase tracking-wider">Microphone</span>
+                          <select
+                            value={selectedAudioDevice}
+                            onChange={(e) => switchAudioDevice(e.target.value)}
+                            className="w-full px-2.5 py-1.5 rounded-lg bg-neutral-50 text-[11px] text-text outline-none cursor-pointer"
+                            style={{ boxShadow: "var(--shadow-ring)" }}
+                          >
+                            {(devices || []).filter((d) => d.kind === "audioinput").map((d) => (
+                              <option key={d.deviceId} value={d.deviceId}>
+                                {d.label || `Mic ${d.deviceId.slice(0, 5)}`}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="flex flex-col gap-1.5">
+                          <span className="text-[10px] font-semibold text-text-secondary uppercase tracking-wider">Camera</span>
+                          <select
+                            value={selectedVideoDevice}
+                            onChange={(e) => switchVideoDevice(e.target.value)}
+                            className="w-full px-2.5 py-1.5 rounded-lg bg-neutral-50 text-[11px] text-text outline-none cursor-pointer"
+                            style={{ boxShadow: "var(--shadow-ring)" }}
+                          >
+                            {(devices || []).filter((d) => d.kind === "videoinput").map((d) => (
+                              <option key={d.deviceId} value={d.deviceId}>
+                                {d.label || `Camera ${d.deviceId.slice(0, 5)}`}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
               </motion.div>
             </div>
@@ -378,54 +448,37 @@ export function VideoChat({ elapsed }: Props) {
               className="px-4 py-2.5 flex items-center justify-between relative"
               style={{ boxShadow: "0 -1px 0 color(display-p3 0 0 0 / 0.04)" }}
             >
-              <div className="flex items-center gap-3">
-                {/* Connection status */}
-                <div className="flex items-center gap-1.5">
-                  {peerState === "connected" ? (
-                    <>
-                      <div className="flex gap-0.5 items-end">
-                        <div className="w-1 h-2 rounded-full bg-success" />
-                        <div className="w-1 h-3 rounded-full bg-success" />
-                        <div className="w-1 h-4 rounded-full bg-success" />
-                      </div>
-                      <span className="text-[10px] text-success font-medium">Connected</span>
-                    </>
-                  ) : peerState === "connecting" || peerState === "waiting" ? (
-                    <>
-                      <div className="flex gap-0.5 items-end">
-                        <div className="w-1 h-2 rounded-full bg-accent-400" />
-                        <div className="w-1 h-3 rounded-full bg-neutral-300" />
-                        <div className="w-1 h-4 rounded-full bg-neutral-300" />
-                      </div>
-                      <span className="text-[10px] text-text-muted font-medium">
-                        {peerState === "waiting" ? "Searching..." : "Connecting..."}
-                      </span>
-                    </>
-                  ) : (
-                    <span className="text-[10px] text-text-disabled">Idle</span>
-                  )}
-                </div>
-
-                {/* Device selector */}
-                <motion.button
-                  onClick={() => setShowDeviceMenu((v) => !v)}
-                  whileTap={{ scale: 0.95 }}
-                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-neutral-50 text-[10px] font-medium text-text-muted cursor-pointer transition-colors hover:bg-neutral-100"
-                  style={{ boxShadow: "var(--shadow-ring)" }}
-                >
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="3" />
-                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-                  </svg>
-                  Devices
-                </motion.button>
+              {/* Connection status */}
+              <div className="flex items-center gap-1.5">
+                {peerState === "connected" ? (
+                  <>
+                    <div className="flex gap-0.5 items-end">
+                      <div className="w-1 h-2 rounded-full bg-success" />
+                      <div className="w-1 h-3 rounded-full bg-success" />
+                      <div className="w-1 h-4 rounded-full bg-success" />
+                    </div>
+                    <span className="text-[10px] text-success font-medium">Connected</span>
+                  </>
+                ) : peerState === "connecting" || peerState === "waiting" ? (
+                  <>
+                    <div className="flex gap-0.5 items-end">
+                      <div className="w-1 h-2 rounded-full bg-accent-400" />
+                      <div className="w-1 h-3 rounded-full bg-neutral-300" />
+                      <div className="w-1 h-4 rounded-full bg-neutral-300" />
+                    </div>
+                    <span className="text-[10px] text-text-muted font-medium">
+                      {peerState === "waiting" ? "Searching..." : "Connecting..."}
+                    </span>
+                  </>
+                ) : (
+                  <span className="text-[10px] text-text-disabled">Idle</span>
+                )}
               </div>
 
               <div className="flex items-center gap-2">
                 <span className="text-[10px] text-text-disabled">
                   Auto-closes when code is ready
                 </span>
-                {/* Leave button */}
                 <motion.button
                   onClick={handleLeave}
                   whileTap={{ scale: 0.95 }}
@@ -434,53 +487,6 @@ export function VideoChat({ elapsed }: Props) {
                   Leave
                 </motion.button>
               </div>
-
-              {/* Device selection dropdown */}
-              <AnimatePresence>
-                {showDeviceMenu && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 8 }}
-                    transition={{ duration: 0.2, ease: EASE_OUT }}
-                    className="absolute bottom-full left-4 mb-2 w-72 bg-surface rounded-xl p-3 flex flex-col gap-3 z-20"
-                    style={{ boxShadow: "var(--shadow-lg)" }}
-                  >
-                    {/* Mic selector */}
-                    <div className="flex flex-col gap-1.5">
-                      <span className="text-[10px] font-semibold text-text-secondary uppercase tracking-wider">Microphone</span>
-                      <select
-                        value={selectedAudioDevice}
-                        onChange={(e) => switchAudioDevice(e.target.value)}
-                        className="w-full px-2.5 py-1.5 rounded-lg bg-neutral-50 text-[11px] text-text outline-none cursor-pointer"
-                        style={{ boxShadow: "var(--shadow-ring)" }}
-                      >
-                        {(devices || []).filter((d) => d.kind === "audioinput").map((d) => (
-                          <option key={d.deviceId} value={d.deviceId}>
-                            {d.label || `Mic ${d.deviceId.slice(0, 5)}`}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    {/* Camera selector */}
-                    <div className="flex flex-col gap-1.5">
-                      <span className="text-[10px] font-semibold text-text-secondary uppercase tracking-wider">Camera</span>
-                      <select
-                        value={selectedVideoDevice}
-                        onChange={(e) => switchVideoDevice(e.target.value)}
-                        className="w-full px-2.5 py-1.5 rounded-lg bg-neutral-50 text-[11px] text-text outline-none cursor-pointer"
-                        style={{ boxShadow: "var(--shadow-ring)" }}
-                      >
-                        {(devices || []).filter((d) => d.kind === "videoinput").map((d) => (
-                          <option key={d.deviceId} value={d.deviceId}>
-                            {d.label || `Camera ${d.deviceId.slice(0, 5)}`}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
             </div>
           </motion.div>
         )}
