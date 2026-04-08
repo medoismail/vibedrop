@@ -82,13 +82,15 @@ function setupHooks() {
   // Linux: use xdg-open with flag file
   const isMac = process.platform === "darwin";
 
+  // Only open browser if bridge is actually running (curl succeeds)
+  // Only close tab + switch app if vibedrop-open flag exists
   const startCmd = isMac
-    ? `curl -s -m 2 -X POST http://localhost:${PORT}/start > /dev/null 2>&1; if [ ! -f /tmp/vibedrop-open ]; then touch /tmp/vibedrop-open; osascript -e 'tell application "Google Chrome" to activate' -e 'tell application "Google Chrome"' -e 'set found to false' -e 'repeat with w in windows' -e 'set tabIndex to 0' -e 'repeat with t in tabs of w' -e 'set tabIndex to tabIndex + 1' -e 'if URL of t contains "vibedrop.pro" then' -e 'set active tab index of w to tabIndex' -e 'set found to true' -e 'exit repeat' -e 'end if' -e 'end repeat' -e 'if found then exit repeat' -e 'end repeat' -e 'if not found then open location "https://www.vibedrop.pro/app"' -e 'end tell' 2>/dev/null; fi; true`
-    : `curl -s -m 2 -X POST http://localhost:${PORT}/start > /dev/null 2>&1; if [ ! -f /tmp/vibedrop-open ]; then touch /tmp/vibedrop-open; xdg-open 'https://www.vibedrop.pro/app' 2>/dev/null; fi; true`;
+    ? `if curl -s -m 1 -X POST http://localhost:${PORT}/start > /dev/null 2>&1; then if [ ! -f /tmp/vibedrop-open ]; then touch /tmp/vibedrop-open; osascript -e 'tell application "Google Chrome" to activate' -e 'tell application "Google Chrome"' -e 'set found to false' -e 'repeat with w in windows' -e 'set tabIndex to 0' -e 'repeat with t in tabs of w' -e 'set tabIndex to tabIndex + 1' -e 'if URL of t contains "vibedrop.pro" then' -e 'set active tab index of w to tabIndex' -e 'set found to true' -e 'exit repeat' -e 'end if' -e 'end repeat' -e 'if found then exit repeat' -e 'end repeat' -e 'if not found then open location "https://www.vibedrop.pro/app"' -e 'end tell' 2>/dev/null; fi; fi; true`
+    : `if curl -s -m 1 -X POST http://localhost:${PORT}/start > /dev/null 2>&1; then if [ ! -f /tmp/vibedrop-open ]; then touch /tmp/vibedrop-open; xdg-open 'https://www.vibedrop.pro/app' 2>/dev/null; fi; fi; true`;
 
   const stopCmd = isMac
-    ? `curl -s -m 2 -X POST http://localhost:${PORT}/stop > /dev/null 2>&1; rm -f /tmp/vibedrop-open; osascript -e 'tell application "Google Chrome"' -e 'repeat with w in windows' -e 'set tabCount to count of tabs of w' -e 'repeat with i from tabCount to 1 by -1' -e 'if URL of tab i of w contains "vibedrop.pro" then' -e 'delete tab i of w' -e 'end if' -e 'end repeat' -e 'end repeat' -e 'end tell' 2>/dev/null; open -a '${callingApp}' 2>/dev/null; true`
-    : `curl -s -m 2 -X POST http://localhost:${PORT}/stop > /dev/null 2>&1; rm -f /tmp/vibedrop-open; true`;
+    ? `if [ -f /tmp/vibedrop-open ]; then curl -s -m 1 -X POST http://localhost:${PORT}/stop > /dev/null 2>&1; rm -f /tmp/vibedrop-open; osascript -e 'tell application "Google Chrome"' -e 'repeat with w in windows' -e 'set tabCount to count of tabs of w' -e 'repeat with i from tabCount to 1 by -1' -e 'if URL of tab i of w contains "vibedrop.pro" then' -e 'delete tab i of w' -e 'end if' -e 'end repeat' -e 'end repeat' -e 'end tell' 2>/dev/null; open -a '${callingApp}' 2>/dev/null; fi; true`
+    : `if [ -f /tmp/vibedrop-open ]; then curl -s -m 1 -X POST http://localhost:${PORT}/stop > /dev/null 2>&1; rm -f /tmp/vibedrop-open; fi; true`;
 
   const hooksConfig = {
     UserPromptSubmit: {

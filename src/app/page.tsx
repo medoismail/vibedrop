@@ -87,30 +87,6 @@ function HeroAnimation({ started }: { started: boolean }) {
                   maskImage: "radial-gradient(white, black)",
                 }}
               >
-                {/* Warm glow — top right */}
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 0.7, scale: 1 }}
-                  transition={{ duration: 1.2, delay: 0.6, ease: "easeOut" }}
-                  className="absolute"
-                  style={{
-                    top: "-30%", right: "-20%", width: "130%", height: "75%",
-                    borderRadius: "45%", transform: "rotate(-30deg)",
-                    background: "color(display-p3 1 0.6 0.35)",
-                    filter: "blur(100px)", zIndex: 1,
-                  }}
-                />
-
-                {/* Blur SVG shape */}
-                <motion.img
-                  src="/blur-shape.svg"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 0.6 }}
-                  transition={{ duration: 1.5, delay: 0.8 }}
-                  className="absolute pointer-events-none"
-                  style={{ top: "10%", left: "30%", width: "120%", height: "90%", zIndex: 3 }}
-                  alt=""
-                />
 
                 {/* 4 Glass panels — smooth cascade from top */}
                 {[
@@ -153,19 +129,6 @@ function HeroAnimation({ started }: { started: boolean }) {
                   </motion.div>
                 ))}
 
-                {/* Warm glow — bottom left */}
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 0.5, scale: 1 }}
-                  transition={{ duration: 1.2, delay: 0.8, ease: "easeOut" }}
-                  className="absolute"
-                  style={{
-                    bottom: "-15%", left: "-10%", width: "100%", height: "65%",
-                    borderRadius: "45%", transform: "rotate(-25deg)",
-                    background: "color(display-p3 0.95 0.5 0.23)",
-                    filter: "blur(110px)", zIndex: 1,
-                  }}
-                />
 
                 {/* Film grain */}
                 <div
