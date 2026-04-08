@@ -407,11 +407,11 @@ export default function Landing() {
               </motion.div>
 
               <motion.h1 initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.15, ease: EASE_OUT }} className="text-3xl font-bold text-text tracking-tight leading-tight mb-3">
-                Claude&apos;s busy.<br />You don&apos;t have to be.
+                Video chat with devs<br />while Claude thinks.
               </motion.h1>
 
               <motion.p initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.25, ease: EASE_OUT }} className="text-sm text-text-muted leading-relaxed max-w-sm mb-6">
-                While your code builds, hop into a quick video chat with another dev. When it&apos;s done, you&apos;re pulled right back. No tabs, no switching, it just works.
+                One command. When Claude starts working, you get matched with another dev for a video call. When it finishes, you&apos;re back. That&apos;s it.
               </motion.p>
 
               <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.35, ease: EASE_OUT }} className="flex items-start gap-4 mb-6">
@@ -505,10 +505,10 @@ export default function Landing() {
 
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }} className="flex flex-wrap gap-2">
                 {[
-                  { icon: "M15 10l4.553-2.276A1 1 0 0 1 21 8.618v6.764a1 1 0 0 1-1.447.894L15 14v-4z M3 8a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8z", label: "No servers" },
-                  { icon: "M12 15v2m-6 4h12a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2zm10-10V7a4 4 0 0 0-8 0v4h8z", label: "Nothing recorded" },
-                  { icon: "M4.318 6.318a4.5 4.5 0 0 0 0 6.364L12 20.364l7.682-7.682a4.5 4.5 0 0 0-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 0 0-6.364 0z", label: "Keep it chill" },
-                  { icon: "M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z", label: "Free forever" },
+                  { icon: "M15 10l4.553-2.276A1 1 0 0 1 21 8.618v6.764a1 1 0 0 1-1.447.894L15 14v-4z M3 8a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8z", label: "P2P video" },
+                  { icon: "M12 15v2m-6 4h12a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2zm10-10V7a4 4 0 0 0-8 0v4h8z", label: "Not recorded" },
+                  { icon: "M13 10V3L4 14h7v7l9-11h-7z", label: "Auto open + close" },
+                  { icon: "M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z", label: "Free" },
                 ].map((item) => (
                   <div key={item.label} className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-medium text-text-muted" style={{ boxShadow: "0 0 0 1px color(display-p3 0 0 0 / 0.06)" }}>
                     <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-accent-500"><path d={item.icon} /></svg>

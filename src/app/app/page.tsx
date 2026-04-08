@@ -61,8 +61,8 @@ export default function Home() {
                   </h1>
                   <p className="text-sm text-text-muted leading-relaxed">
                     {isDone
-                      ? "Done. Waiting for the next one..."
-                      : "Listening for Claude..."}
+                      ? "Code ready. Waiting for the next task..."
+                      : "Waiting for Claude to start working..."}
                   </p>
                 </motion.div>
 
@@ -111,7 +111,7 @@ export default function Home() {
                     transition={{ delay: 0.4, duration: 0.3 }}
                     className="text-xs text-text-placeholder"
                   >
-                    Video chat will activate the moment Claude starts working
+                    When Claude starts thinking, you&apos;ll get matched with a dev
                   </motion.p>
                 )}
 

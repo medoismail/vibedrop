@@ -136,9 +136,9 @@ export function VideoChat({ elapsed }: Props) {
                 transition={{ delay: 0.1, duration: 0.35, ease: EASE_OUT }}
                 className="flex flex-col gap-2"
               >
-                <h2 className="text-xl font-bold text-text">Your code is cooking</h2>
+                <h2 className="text-xl font-bold text-text">Claude is working</h2>
                 <p className="text-sm text-text-muted leading-relaxed">
-                  Hop into a video chat with another dev while you wait. Camera and mic needed.
+                  Talk to another dev while you wait. Needs camera and mic.
                 </p>
               </motion.div>
 
@@ -172,7 +172,7 @@ export function VideoChat({ elapsed }: Props) {
                 transition={{ delay: 0.3 }}
                 className="text-[11px] text-text-disabled"
               >
-                You&apos;ll be pulled back when the code is ready
+                Auto-closes when Claude finishes
               </motion.span>
 
               <motion.p
@@ -181,7 +181,7 @@ export function VideoChat({ elapsed }: Props) {
                 transition={{ delay: 0.4 }}
                 className="text-[10px] text-text-disabled leading-relaxed"
               >
-                By joining, you agree to keep things respectful. Be cool.
+                Be respectful. No recordings. P2P only.
               </motion.p>
             </div>
           </motion.div>
