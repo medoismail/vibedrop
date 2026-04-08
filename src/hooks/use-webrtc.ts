@@ -1,0 +1,339 @@
+"use client";
+
+import { useState, useRef, useCallback, useEffect } from "react";
+
+type PeerState =
+  | "idle"
+  | "waiting"
+  | "connecting"
+  | "connected"
+  | "disconnected";
+
+interface ChatMessage {
+  text: string;
+  from: "you" | "peer" | "system";
+}
+
+const ICE_SERVERS: RTCIceServer[] = [
+  { urls: "stun:stun.l.google.com:19302" },
+  { urls: "stun:stun1.l.google.com:19302" },
+  { urls: "stun:stun2.l.google.com:19302" },
+  { urls: "stun:stun3.l.google.com:19302" },
+  // Add TURN servers here for users behind strict NATs:
+  // { urls: "turn:your-turn-server.com:3478", username: "user", credential: "pass" },
+];
+
+const WS_URL =
+  process.env.NEXT_PUBLIC_WS_URL ??
+  (typeof window !== "undefined" && window.location.hostname !== "localhost"
+    ? `wss://${window.location.hostname}`
+    : "ws://localhost:3009");
+
+export function useWebRTC(localStream: MediaStream | null) {
+  const [peerState, setPeerState] = useState<PeerState>("idle");
+  const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [wsConnected, setWsConnected] = useState(false);
+
+  const wsRef = useRef<WebSocket | null>(null);
+  const pcRef = useRef<RTCPeerConnection | null>(null);
+  const dcRef = useRef<RTCDataChannel | null>(null);
+  const reconnectRef = useRef<ReturnType<typeof setTimeout>>();
+  const isInitiatorRef = useRef(false);
+
+  // ─── WebSocket connection ───
+
+  const connectWs = useCallback(() => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) return;
+
+    try {
+      const ws = new WebSocket(WS_URL);
+
+      ws.onopen = () => {
+        setWsConnected(true);
+      };
+
+      ws.onmessage = (event) => {
+        let msg;
+        try {
+          msg = JSON.parse(event.data);
+        } catch {
+          return;
+        }
+        handleSignal(msg);
+      };
+
+      ws.onclose = () => {
+        setWsConnected(false);
+        wsRef.current = null;
+        reconnectRef.current = setTimeout(connectWs, 3000);
+      };
+
+      ws.onerror = () => ws.close();
+
+      wsRef.current = ws;
+    } catch {
+      reconnectRef.current = setTimeout(connectWs, 3000);
+    }
+  }, []);
+
+  // ─── Send via WebSocket ───
+
+  const wsSend = useCallback((data: Record<string, unknown>) => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify(data));
+    }
+  }, []);
+
+  // ─── Create peer connection ───
+
+  const createPC = useCallback(() => {
+    closePeerConnection();
+
+    const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+
+    // Add local tracks
+    if (localStream) {
+      for (const track of localStream.getTracks()) {
+        pc.addTrack(track, localStream);
+      }
+    }
+
+    // Receive remote tracks
+    pc.ontrack = (event) => {
+      setRemoteStream(event.streams[0] ?? null);
+    };
+
+    // ICE candidates → relay via signaling
+    pc.onicecandidate = (event) => {
+      if (event.candidate) {
+        wsSend({ type: "ice", candidate: event.candidate.toJSON() });
+      }
+    };
+
+    pc.onconnectionstatechange = () => {
+      if (pc.connectionState === "connected") {
+        setPeerState("connected");
+      } else if (
+        pc.connectionState === "disconnected" ||
+        pc.connectionState === "failed"
+      ) {
+        setPeerState("disconnected");
+      }
+    };
+
+    // DataChannel for text chat
+    if (isInitiatorRef.current) {
+      const dc = pc.createDataChannel("chat");
+      setupDataChannel(dc);
+    } else {
+      pc.ondatachannel = (event) => {
+        setupDataChannel(event.channel);
+      };
+    }
+
+    pcRef.current = pc;
+    return pc;
+  }, [localStream, wsSend]);
+
+  // ─── DataChannel setup ───
+
+  function setupDataChannel(dc: RTCDataChannel) {
+    dcRef.current = dc;
+
+    dc.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === "chat") {
+          setMessages((prev) => [
+            ...prev.slice(-20),
+            { text: data.text, from: "peer" },
+          ]);
+        }
+      } catch {}
+    };
+
+    dc.onclose = () => {
+      dcRef.current = null;
+    };
+  }
+
+  // ─── Close peer connection ───
+
+  function closePeerConnection() {
+    if (dcRef.current) {
+      dcRef.current.close();
+      dcRef.current = null;
+    }
+    if (pcRef.current) {
+      pcRef.current.close();
+      pcRef.current = null;
+    }
+    setRemoteStream(null);
+  }
+
+  // ─── Handle signaling messages ───
+
+  const handleSignal = useCallback(
+    async (msg: Record<string, unknown>) => {
+      switch (msg.type) {
+        case "state":
+          // Claude state — handled by useClaudeBridge, ignore here
+          break;
+
+        case "waiting":
+          setPeerState("waiting");
+          setMessages([
+            { text: "Looking for someone to chat with...", from: "system" },
+          ]);
+          break;
+
+        case "matched": {
+          isInitiatorRef.current = msg.initiator as boolean;
+          setPeerState("connecting");
+          setMessages([
+            { text: "Found someone! Connecting...", from: "system" },
+          ]);
+
+          const pc = createPC();
+
+          if (isInitiatorRef.current) {
+            try {
+              const offer = await pc.createOffer();
+              await pc.setLocalDescription(offer);
+              wsSend({ type: "offer", sdp: offer });
+            } catch (err) {
+              console.error("[webrtc] offer error:", err);
+            }
+          }
+          break;
+        }
+
+        case "offer": {
+          if (!pcRef.current) createPC();
+          const pc = pcRef.current!;
+          try {
+            await pc.setRemoteDescription(
+              new RTCSessionDescription(msg.sdp as RTCSessionDescriptionInit)
+            );
+            const answer = await pc.createAnswer();
+            await pc.setLocalDescription(answer);
+            wsSend({ type: "answer", sdp: answer });
+          } catch (err) {
+            console.error("[webrtc] answer error:", err);
+          }
+          break;
+        }
+
+        case "answer": {
+          if (pcRef.current) {
+            try {
+              await pcRef.current.setRemoteDescription(
+                new RTCSessionDescription(msg.sdp as RTCSessionDescriptionInit)
+              );
+            } catch (err) {
+              console.error("[webrtc] setRemoteDesc error:", err);
+            }
+          }
+          break;
+        }
+
+        case "ice": {
+          if (pcRef.current) {
+            try {
+              await pcRef.current.addIceCandidate(
+                new RTCIceCandidate(msg.candidate as RTCIceCandidateInit)
+              );
+            } catch (err) {
+              console.error("[webrtc] addIceCandidate error:", err);
+            }
+          }
+          break;
+        }
+
+        case "chat": {
+          // Fallback chat via signaling server
+          setMessages((prev) => [
+            ...prev.slice(-20),
+            { text: msg.text as string, from: "peer" },
+          ]);
+          break;
+        }
+
+        case "peer-left": {
+          closePeerConnection();
+          setPeerState("disconnected");
+          setMessages((prev) => [
+            ...prev.slice(-20),
+            { text: "They disconnected", from: "system" },
+          ]);
+          break;
+        }
+      }
+    },
+    [createPC, wsSend]
+  );
+
+  // ─── Public actions ───
+
+  const join = useCallback(() => {
+    closePeerConnection();
+    setMessages([]);
+    wsSend({ type: "join" });
+    setPeerState("waiting");
+  }, [wsSend]);
+
+  const skip = useCallback(() => {
+    closePeerConnection();
+    setMessages([]);
+    wsSend({ type: "skip" });
+    setPeerState("waiting");
+  }, [wsSend]);
+
+  const leave = useCallback(() => {
+    closePeerConnection();
+    wsSend({ type: "leave" });
+    setPeerState("idle");
+    setMessages([]);
+  }, [wsSend]);
+
+  const sendChat = useCallback(
+    (text: string) => {
+      setMessages((prev) => [
+        ...prev.slice(-20),
+        { text, from: "you" },
+      ]);
+
+      // Try DataChannel first (P2P, no server)
+      if (dcRef.current?.readyState === "open") {
+        dcRef.current.send(JSON.stringify({ type: "chat", text }));
+      } else {
+        // Fallback: relay via signaling server
+        wsSend({ type: "chat", text });
+      }
+    },
+    [wsSend]
+  );
+
+  // ─── Lifecycle ───
+
+  useEffect(() => {
+    connectWs();
+    return () => {
+      closePeerConnection();
+      if (wsRef.current) wsRef.current.close();
+      if (reconnectRef.current) clearTimeout(reconnectRef.current);
+    };
+  }, [connectWs]);
+
+  return {
+    peerState,
+    remoteStream,
+    messages,
+    wsConnected,
+    join,
+    skip,
+    leave,
+    sendChat,
+  };
+}

@@ -1,0 +1,25 @@
+{
+  "name": "vibetalkes",
+  "version": "0.1.0",
+  "description": "Chat with strangers while Claude codes. Video chat that activates only when AI is thinking.",
+  "bin": {
+    "vibetalkes": "./index.mjs"
+  },
+  "keywords": [
+    "claude",
+    "vibe-coding",
+    "video-chat",
+    "omegle",
+    "webrtc",
+    "ai",
+    "claude-code"
+  ],
+  "author": "",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "ws": "^8.20.0"
+  }
+}

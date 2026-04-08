@@ -1,0 +1,139 @@
+@import "tailwindcss";
+@import "@fontsource/inter-tight/400.css";
+@import "@fontsource/inter-tight/500.css";
+@import "@fontsource/inter-tight/600.css";
+@import "@fontsource/inter-tight/700.css";
+
+/*
+ * Range DS Color Tokens — Light Mode (P3 gamut)
+ * Brand: #E96310 / OKLCH L:65.9% C:0.184 H:44.7
+ */
+
+@theme inline {
+  /* Primitive: Neutral Scale */
+  --color-neutral-50: color(display-p3 0.984 0.98 0.976);
+  --color-neutral-100: color(display-p3 0.961 0.953 0.949);
+  --color-neutral-200: color(display-p3 0.918 0.906 0.902);
+  --color-neutral-300: color(display-p3 0.855 0.843 0.839);
+  --color-neutral-400: color(display-p3 0.733 0.718 0.71);
+  --color-neutral-500: color(display-p3 0.576 0.561 0.553);
+  --color-neutral-600: color(display-p3 0.427 0.412 0.404);
+  --color-neutral-700: color(display-p3 0.318 0.302 0.294);
+  --color-neutral-800: color(display-p3 0.192 0.18 0.173);
+  --color-neutral-900: color(display-p3 0.075 0.067 0.063);
+  --color-neutral-950: color(display-p3 0.024 0.02 0.016);
+
+  /* Primitive: Accent Scale */
+  --color-accent-100: color(display-p3 0.949 0.941 0.937);
+  --color-accent-200: color(display-p3 0.902 0.882 0.867);
+  --color-accent-300: color(display-p3 0.855 0.71 0.639);
+  --color-accent-400: color(display-p3 0.843 0.494 0.318);
+  --color-accent-500: color(display-p3 0.878 0.404 0.098);
+  --color-accent-600: color(display-p3 0.514 0.243 0.098);
+  --color-accent-700: color(display-p3 0.396 0.196 0.098);
+  --color-accent-800: color(display-p3 0.267 0.145 0.09);
+  --color-accent-900: color(display-p3 0.133 0.071 0.043);
+
+  /* Semantic: Light Mode */
+  --color-bg: color(display-p3 0.965 0.961 0.957);
+  --color-surface: color(display-p3 1 1 1);
+  --color-surface-secondary: color(display-p3 0.906 0.902 0.902);
+  --color-surface-hover: color(display-p3 0.933 0.929 0.929);
+
+  --color-bg-fill: color(display-p3 0.878 0.404 0.098);
+  --color-bg-fill-hover: color(display-p3 0.769 0.357 0.118);
+
+  --color-text: color(display-p3 0 0 0);
+  --color-text-secondary: color(display-p3 0.035 0.031 0.027);
+  --color-text-muted: color(display-p3 0.153 0.145 0.141);
+  --color-text-placeholder: color(display-p3 0.282 0.278 0.278);
+  --color-text-disabled: color(display-p3 0.424 0.42 0.42);
+  --color-text-inverse: color(display-p3 0.965 0.961 0.957);
+  --color-text-on-fill: color(display-p3 1 1 1);
+
+  --color-border: color(display-p3 0.69 0.678 0.675);
+  --color-border-secondary: color(display-p3 0.792 0.792 0.788);
+  --color-border-focus: color(display-p3 0.878 0.404 0.098);
+  --color-border-input: color(display-p3 0.584 0.576 0.569);
+
+  /* Status */
+  --color-success: color(display-p3 0.165 0.298 0.173);
+  --color-success-bg: color(display-p3 0.922 0.941 0.922);
+  --color-error: color(display-p3 0.408 0.18 0.169);
+  --color-error-bg: color(display-p3 0.941 0.933 0.929);
+
+  /* Video chat (light — uses shadows instead of borders for depth) */
+  --color-video-bg: color(display-p3 0.965 0.961 0.957);
+  --color-video-surface: color(display-p3 1 1 1);
+  --color-video-border: color(display-p3 0.792 0.792 0.788);
+  --color-video-text: color(display-p3 0 0 0);
+  --color-video-muted: color(display-p3 0.427 0.412 0.404);
+  --color-video-accent: color(display-p3 0.878 0.404 0.098);
+
+  --font-sans: "Inter Tight", ui-sans-serif, system-ui, sans-serif;
+
+  /* Shadow scale (stroke-to-shadow) */
+  --shadow-xs: 0 1px 2px color(display-p3 0 0 0 / 0.04);
+  --shadow-sm: 0 1px 3px color(display-p3 0 0 0 / 0.06), 0 1px 2px color(display-p3 0 0 0 / 0.04);
+  --shadow-md: 0 4px 12px color(display-p3 0 0 0 / 0.07), 0 2px 4px color(display-p3 0 0 0 / 0.04);
+  --shadow-lg: 0 8px 24px color(display-p3 0 0 0 / 0.08), 0 4px 8px color(display-p3 0 0 0 / 0.04);
+  --shadow-ring: 0 0 0 1px color(display-p3 0 0 0 / 0.06);
+  --shadow-ring-accent: 0 0 0 2px color(display-p3 0.878 0.404 0.098 / 0.3);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  font-family: var(--font-sans);
+  overflow-anchor: none;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  letter-spacing: -0.01em;
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  letter-spacing: -0.025em;
+  text-wrap: balance;
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: color(display-p3 0.792 0.792 0.788);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Focus ring — accessibility */
+:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
