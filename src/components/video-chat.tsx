@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { useWebcam } from "@/hooks/use-webcam";
 import { useWebRTC } from "@/hooks/use-webrtc";
+import { useSounds } from "@/hooks/use-sounds";
 import { PeerVideo } from "./stranger-video";
 import { ThinkingIndicator } from "./thinking-indicator";
 
@@ -34,6 +35,8 @@ export function VideoChat({ elapsed }: Props) {
   const [confirmed, setConfirmed] = useState(false);
   const [reported, setReported] = useState(false);
   const [showDeviceMenu, setShowDeviceMenu] = useState(false);
+  const { playConnected, playDisconnected } = useSounds();
+  const prevPeerState = useRef(peerState);
 
   const {
     peerState,
@@ -56,13 +59,27 @@ export function VideoChat({ elapsed }: Props) {
         leave();
       }
     };
-  }, [confirmed, start, stop, leave]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [confirmed]);
 
   useEffect(() => {
     if (confirmed && isActive && stream) {
       join();
     }
   }, [confirmed, isActive, stream, join]);
+
+  // Play sounds on peer state changes
+  useEffect(() => {
+    const prev = prevPeerState.current;
+    prevPeerState.current = peerState;
+
+    if (peerState === "connected" && prev !== "connected") {
+      playConnected();
+    }
+    if (peerState === "disconnected" && prev === "connected") {
+      playDisconnected();
+    }
+  }, [peerState, playConnected, playDisconnected]);
 
   const handleReport = () => {
     skip();

@@ -314,6 +314,24 @@ export function useWebRTC(localStream: MediaStream | null) {
     [wsSend]
   );
 
+  // ─── Add tracks when stream becomes available (or changes) ───
+
+  useEffect(() => {
+    const pc = pcRef.current;
+    if (!pc || !localStream) return;
+
+    // Get existing senders
+    const senders = pc.getSenders();
+    const existingTrackIds = new Set(senders.map((s) => s.track?.id).filter(Boolean));
+
+    // Add any new tracks from the stream
+    for (const track of localStream.getTracks()) {
+      if (!existingTrackIds.has(track.id)) {
+        pc.addTrack(track, localStream);
+      }
+    }
+  }, [localStream]);
+
   // ─── Lifecycle ───
 
   useEffect(() => {
