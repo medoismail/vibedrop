@@ -112,9 +112,10 @@ function HeroAnimation({ started }: { started: boolean }) {
                       zIndex: panel.z,
                     }}
                   >
-                    {/* Gentle breathing drift */}
+                    {/* Gentle breathing drift — starts after intro lands */}
                     <motion.div
                       className="absolute inset-0"
+                      initial={{ x: 0, y: 0 }}
                       animate={{
                         x: [0, -(8 + i * 2), 0],
                         y: [0, -(3 + i), 0],
@@ -123,7 +124,7 @@ function HeroAnimation({ started }: { started: boolean }) {
                         duration: 5 + i * 0.8,
                         repeat: Infinity,
                         ease: "easeInOut",
-                        delay: 1.5 + i * 0.3,
+                        delay: panel.delay + 1.4,
                       }}
                     />
                   </motion.div>
