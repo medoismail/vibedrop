@@ -112,21 +112,21 @@ function HeroAnimation({ started }: { started: boolean }) {
                   alt=""
                 />
 
-                {/* 4 Glass panels — slide from top */}
+                {/* 4 Glass panels — smooth cascade from top */}
                 {[
-                  { left: "49.6%", delay: 0.15, z: 4 },
-                  { left: "61.7%", delay: 0.3, z: 5 },
-                  { left: "73.9%", delay: 0.45, z: 6 },
-                  { left: "86%", delay: 0.6, z: 7 },
+                  { left: "49.6%", delay: 0.3, z: 4 },
+                  { left: "61.7%", delay: 0.45, z: 5 },
+                  { left: "73.9%", delay: 0.6, z: 6 },
+                  { left: "86%", delay: 0.75, z: 7 },
                 ].map((panel, i) => (
                   <motion.div
                     key={i}
                     className="absolute"
-                    initial={{ y: "-110%" }}
-                    animate={{ y: 0 }}
+                    initial={{ y: "-110%", opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
                     transition={{
-                      type: "spring", stiffness: 60, damping: 16, mass: 1.5,
-                      delay: panel.delay,
+                      y: { duration: 1.2, ease: [0.16, 1, 0.3, 1], delay: panel.delay },
+                      opacity: { duration: 0.6, ease: "easeOut", delay: panel.delay },
                     }}
                     style={{
                       left: panel.left, right: 0, top: 0, bottom: "16%",
@@ -136,14 +136,18 @@ function HeroAnimation({ started }: { started: boolean }) {
                       zIndex: panel.z,
                     }}
                   >
+                    {/* Gentle breathing drift */}
                     <motion.div
                       className="absolute inset-0"
-                      animate={{ x: [0, -(12 + i * 4), 0] }}
+                      animate={{
+                        x: [0, -(8 + i * 2), 0],
+                        y: [0, -(3 + i), 0],
+                      }}
                       transition={{
-                        duration: 4 + i * 0.5,
+                        duration: 5 + i * 0.8,
                         repeat: Infinity,
                         ease: "easeInOut",
-                        delay: 1.2 + i * 0.2,
+                        delay: 1.5 + i * 0.3,
                       }}
                     />
                   </motion.div>
