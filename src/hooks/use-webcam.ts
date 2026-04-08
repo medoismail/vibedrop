@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 export function useWebcam() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const [stream, setStream] = useState<MediaStream | null>(null);
   const [isActive, setIsActive] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [isCamOff, setIsCamOff] = useState(false);
@@ -24,40 +25,44 @@ export function useWebcam() {
     async (audioId?: string, videoId?: string) => {
       try {
         setError(null);
-        // Stop existing stream first
         if (streamRef.current) {
           streamRef.current.getTracks().forEach((track) => track.stop());
         }
-        const stream = await navigator.mediaDevices.getUserMedia({
+        const newStream = await navigator.mediaDevices.getUserMedia({
           video: videoId
             ? { deviceId: { exact: videoId } }
             : { width: 640, height: 480, facingMode: "user" },
           audio: audioId ? { deviceId: { exact: audioId } } : true,
         });
-        streamRef.current = stream;
+        streamRef.current = newStream;
+        setStream(newStream);
         if (videoRef.current) {
-          videoRef.current.srcObject = stream;
+          videoRef.current.srcObject = newStream;
         }
         setIsActive(true);
         setIsMuted(false);
         setIsCamOff(false);
 
-        // Update selected device IDs from actual tracks
-        const audioTrack = stream.getAudioTracks()[0];
-        const videoTrack = stream.getVideoTracks()[0];
-        if (audioTrack) {
-          const settings = audioTrack.getSettings();
-          if (settings.deviceId) setSelectedAudioDevice(settings.deviceId);
+        const audioTrack = newStream.getAudioTracks()[0];
+        const videoTrack = newStream.getVideoTracks()[0];
+        if (audioTrack?.getSettings().deviceId) {
+          setSelectedAudioDevice(audioTrack.getSettings().deviceId!);
         }
-        if (videoTrack) {
-          const settings = videoTrack.getSettings();
-          if (settings.deviceId) setSelectedVideoDevice(settings.deviceId);
+        if (videoTrack?.getSettings().deviceId) {
+          setSelectedVideoDevice(videoTrack.getSettings().deviceId!);
         }
 
-        // Re-enumerate to get labels (only available after permission)
         await enumerateDevices();
-      } catch {
-        setError("Camera access denied");
+      } catch (err) {
+        const msg =
+          err instanceof DOMException && err.name === "NotAllowedError"
+            ? "Camera access denied — check browser permissions"
+            : err instanceof DOMException && err.name === "NotFoundError"
+            ? "No camera or microphone found"
+            : err instanceof DOMException && err.name === "NotReadableError"
+            ? "Camera is in use by another app"
+            : "Could not access camera";
+        setError(msg);
         setIsActive(false);
       }
     },
@@ -73,6 +78,7 @@ export function useWebcam() {
       streamRef.current.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
     }
+    setStream(null);
     if (videoRef.current) {
       videoRef.current.srcObject = null;
     }
@@ -125,7 +131,7 @@ export function useWebcam() {
 
   return {
     videoRef,
-    stream: streamRef.current,
+    stream,
     isActive,
     isMuted,
     isCamOff,
