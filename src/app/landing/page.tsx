@@ -226,8 +226,7 @@ function HeroAnimation({ started }: { started: boolean }) {
           >
             <div
               className="rounded-2xl p-6 h-full flex flex-col items-center justify-center gap-3 relative overflow-hidden"
-              style={{ background: "color(display-p3 0.975 0.973 0.97)" }}
-              style={{ boxShadow: "0 0 0 1px color(display-p3 0 0 0 / 0.06)" }}
+              style={{ background: "color(display-p3 0.975 0.973 0.97)", boxShadow: "0 0 0 1px color(display-p3 0 0 0 / 0.06)" }}
             >
               <div className="relative w-12 h-12">
                 <motion.div className="absolute inset-0 rounded-full bg-accent-500/10" animate={{ scale: [1, 1.5, 1], opacity: [0.3, 0, 0.3] }} transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }} />
@@ -254,8 +253,7 @@ function HeroAnimation({ started }: { started: boolean }) {
           >
             <div
               className="rounded-2xl overflow-hidden flex flex-col h-full"
-              style={{ background: "color(display-p3 0.975 0.973 0.97)" }}
-              style={{ boxShadow: "0 0 0 1px color(display-p3 0 0 0 / 0.06)" }}
+              style={{ background: "color(display-p3 0.975 0.973 0.97)", boxShadow: "0 0 0 1px color(display-p3 0 0 0 / 0.06)" }}
             >
               {/* Header */}
               <div className="flex items-center justify-between px-4 py-2.5" style={{ boxShadow: "0 1px 0 color(display-p3 0 0 0 / 0.04)" }}>
@@ -325,8 +323,7 @@ function HeroAnimation({ started }: { started: boolean }) {
           >
             <div
               className="rounded-2xl p-6 h-full flex flex-col items-center justify-center gap-3"
-              style={{ background: "color(display-p3 0.975 0.973 0.97)" }}
-              style={{ boxShadow: "0 0 0 1px color(display-p3 0 0 0 / 0.06)" }}
+              style={{ background: "color(display-p3 0.975 0.973 0.97)", boxShadow: "0 0 0 1px color(display-p3 0 0 0 / 0.06)" }}
             >
               <motion.div
                 initial={{ scale: 0.7, opacity: 0 }}

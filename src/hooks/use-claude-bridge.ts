@@ -12,8 +12,8 @@ export function useClaudeBridge() {
   const [elapsed, setElapsed] = useState(0);
   const [connected, setConnected] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
-  const timerRef = useRef<ReturnType<typeof setInterval>>();
-  const reconnectRef = useRef<ReturnType<typeof setTimeout>>();
+  const timerRef = useRef<ReturnType<typeof setInterval>>(undefined);
+  const reconnectRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const thinkingStartRef = useRef<number | null>(null);
 
   const connect = useCallback(() => {

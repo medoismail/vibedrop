@@ -38,7 +38,7 @@ export function useWebRTC(localStream: MediaStream | null) {
   const wsRef = useRef<WebSocket | null>(null);
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const dcRef = useRef<RTCDataChannel | null>(null);
-  const reconnectRef = useRef<ReturnType<typeof setTimeout>>();
+  const reconnectRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const isInitiatorRef = useRef(false);
 
   // ─── WebSocket connection ───
