@@ -36,7 +36,6 @@ export function VideoChat({ elapsed }: Props) {
   const [reported, setReported] = useState(false);
   const [showDeviceMenu, setShowDeviceMenu] = useState(false);
   const { playConnected, playDisconnected } = useSounds();
-  const prevPeerState = useRef(peerState);
 
   const {
     peerState,
@@ -48,6 +47,8 @@ export function VideoChat({ elapsed }: Props) {
     leave,
     sendChat,
   } = useWebRTC(stream);
+
+  const prevPeerState = useRef(peerState);
 
   useEffect(() => {
     if (confirmed) {
