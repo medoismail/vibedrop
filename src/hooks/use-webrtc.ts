@@ -23,11 +23,10 @@ const ICE_SERVERS: RTCIceServer[] = [
   // { urls: "turn:your-turn-server.com:3478", username: "user", credential: "pass" },
 ];
 
+// Signaling server — deployed on Fly.io, shared by all users
 const WS_URL =
-  process.env.NEXT_PUBLIC_WS_URL ??
-  (typeof window !== "undefined" && window.location.hostname !== "localhost"
-    ? `wss://${window.location.hostname}`
-    : "ws://localhost:3009");
+  process.env.NEXT_PUBLIC_SIGNALING_URL ??
+  "wss://vibedrop-signaling.fly.dev";
 
 export function useWebRTC(localStream: MediaStream | null) {
   const [peerState, setPeerState] = useState<PeerState>("idle");

@@ -89,15 +89,18 @@ export default function Home() {
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ delay: 0.35 }}
-                    className="flex flex-col items-center gap-2.5"
+                    className="flex flex-col items-center gap-3"
                   >
-                    <span className="text-xs text-text-placeholder">Start the bridge server:</span>
+                    <span className="text-xs text-text-placeholder">Run this in your terminal:</span>
                     <code
                       className="text-[12px] text-accent-600 font-mono bg-surface px-4 py-2 rounded-xl"
                       style={{ boxShadow: "var(--shadow-ring), var(--shadow-xs)" }}
                     >
-                      npm run bridge
+                      npx vibedrop
                     </code>
+                    <span className="text-[10px] text-text-disabled">
+                      Sets up hooks, starts the bridge, and opens VibeDrop
+                    </span>
                   </motion.div>
                 )}
 

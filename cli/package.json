@@ -1,6 +1,6 @@
 {
   "name": "vibedrop",
-  "version": "0.1.1",
+  "version": "0.1.3",
   "description": "Talk to devs while Claude codes. Video chat that activates only when AI is thinking.",
   "bin": {
     "vibedrop": "index.mjs"

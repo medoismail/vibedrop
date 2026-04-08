@@ -76,51 +76,66 @@ function setupHooks() {
 
   if (!settings.hooks) settings.hooks = {};
 
+  const callingApp = detectTerminal();
+
+  // macOS: use AppleScript to reuse existing tab (no duplicates)
+  // Linux: use xdg-open with flag file
+  const isMac = process.platform === "darwin";
+
+  const startCmd = isMac
+    ? `curl -s -m 2 -X POST http://localhost:${PORT}/start > /dev/null 2>&1; if [ ! -f /tmp/vibedrop-open ]; then touch /tmp/vibedrop-open; osascript -e 'tell application "Google Chrome" to activate' -e 'tell application "Google Chrome"' -e 'set found to false' -e 'repeat with w in windows' -e 'set tabIndex to 0' -e 'repeat with t in tabs of w' -e 'set tabIndex to tabIndex + 1' -e 'if URL of t contains "vibedrop.pro" then' -e 'set active tab index of w to tabIndex' -e 'set found to true' -e 'exit repeat' -e 'end if' -e 'end repeat' -e 'if found then exit repeat' -e 'end repeat' -e 'if not found then open location "https://www.vibedrop.pro/app"' -e 'end tell' 2>/dev/null; fi; true`
+    : `curl -s -m 2 -X POST http://localhost:${PORT}/start > /dev/null 2>&1; if [ ! -f /tmp/vibedrop-open ]; then touch /tmp/vibedrop-open; xdg-open 'https://www.vibedrop.pro/app' 2>/dev/null; fi; true`;
+
+  const stopCmd = isMac
+    ? `curl -s -m 2 -X POST http://localhost:${PORT}/stop > /dev/null 2>&1; rm -f /tmp/vibedrop-open; osascript -e 'tell application "Google Chrome"' -e 'repeat with w in windows' -e 'set tabCount to count of tabs of w' -e 'repeat with i from tabCount to 1 by -1' -e 'if URL of tab i of w contains "vibedrop.pro" then' -e 'delete tab i of w' -e 'end if' -e 'end repeat' -e 'end repeat' -e 'end tell' 2>/dev/null; open -a '${callingApp}' 2>/dev/null; true`
+    : `curl -s -m 2 -X POST http://localhost:${PORT}/stop > /dev/null 2>&1; rm -f /tmp/vibedrop-open; true`;
+
   const hooksConfig = {
-    PreToolCall: {
+    UserPromptSubmit: {
       matcher: "",
-      hooks: [
-        {
-          type: "command",
-          command:
-            'curl -s -X POST http://localhost:3009/start > /dev/null 2>&1 && osascript -e \'tell application "Google Chrome" to activate\' 2>/dev/null &',
-        },
-      ],
+      hooks: [{ type: "command", command: startCmd }],
     },
     Stop: {
       matcher: "",
-      hooks: [
-        {
-          type: "command",
-          command:
-            `curl -s -X POST http://localhost:3009/stop > /dev/null 2>&1 && osascript -e 'tell application "${detectTerminal()}" to activate' 2>/dev/null &`,
-        },
-      ],
+      hooks: [{ type: "command", command: stopCmd }],
     },
   };
+
+  // Clean up old invalid hook keys (PreToolCall, PostToolCall, PreToolUse)
+  for (const stale of ["PreToolCall", "PostToolCall", "PreToolUse"]) {
+    if (settings.hooks[stale]) {
+      settings.hooks[stale] = settings.hooks[stale].filter(
+        (r) => !r.hooks?.some((h) => h.command?.includes(`localhost:${PORT}`))
+      );
+      if (settings.hooks[stale].length === 0) {
+        delete settings.hooks[stale];
+        log(`${c.dim}- Removed old ${stale} hook${c.reset}`);
+      }
+    }
+  }
 
   let added = 0;
 
   for (const [event, rule] of Object.entries(hooksConfig)) {
     if (!settings.hooks[event]) settings.hooks[event] = [];
 
-    const exists = settings.hooks[event].some((r) =>
-      r.hooks?.some((h) => h.command?.includes("localhost:3009"))
+    // Remove old VibeDrop hooks from this event
+    settings.hooks[event] = settings.hooks[event].filter(
+      (r) => !r.hooks?.some((h) => h.command?.includes(`localhost:${PORT}`))
     );
 
-    if (!exists) {
-      settings.hooks[event].push(rule);
-      added++;
-      log(`${c.green}+${c.reset} Added ${c.bold}${event}${c.reset} hook`);
-    } else {
-      log(`${c.dim}~ ${event} hook already exists${c.reset}`);
-    }
+    settings.hooks[event].push(rule);
+    added++;
+    log(`${c.green}+${c.reset} Added ${c.bold}${event}${c.reset} hook`);
   }
 
   writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + "\n");
 
   if (added > 0) {
     log(`${c.green}${c.bold}Hooks installed${c.reset} ${c.dim}(${settingsPath})${c.reset}`);
+    console.log();
+    log(`${c.orange}${c.bold}⚡ Restart your Claude session${c.reset} for hooks to take effect.`);
+    log(`${c.dim}Close the current Claude Code or Desktop session and start a new one.${c.reset}`);
   } else {
     log(`${c.dim}Hooks already configured${c.reset}`);
   }
