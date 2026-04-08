@@ -1,21 +1,28 @@
 {
-  "name": "vibetalkes",
-  "version": "0.1.0",
-  "description": "Chat with strangers while Claude codes. Video chat that activates only when AI is thinking.",
+  "name": "vibedrop",
+  "version": "0.1.1",
+  "description": "Talk to devs while Claude codes. Video chat that activates only when AI is thinking.",
   "bin": {
-    "vibetalkes": "./index.mjs"
+    "vibedrop": "index.mjs"
   },
   "keywords": [
     "claude",
+    "claude-code",
     "vibe-coding",
+    "vibedrop",
     "video-chat",
-    "omegle",
     "webrtc",
     "ai",
-    "claude-code"
+    "developer-tools",
+    "peer-to-peer"
   ],
   "author": "",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/medoismail/vibedrop"
+  },
+  "homepage": "https://vibedrop.pro",
   "engines": {
     "node": ">=18"
   },

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * Vibe Talkes CLI
+ * VibeDrop CLI
  *
  * Usage:
  *   npx vibetalkes          → setup hooks + start bridge + open browser
@@ -38,7 +38,7 @@ function log(msg) {
 
 function banner() {
   console.log();
-  log(`${c.orange}${c.bold}Vibe Talkes${c.reset} ${c.dim}v${VERSION}${c.reset}`);
+  log(`${c.orange}${c.bold}VibeDrop${c.reset} ${c.dim}v${VERSION}${c.reset}`);
   log(`${c.dim}Chat with strangers while Claude codes${c.reset}`);
   console.log();
 }
