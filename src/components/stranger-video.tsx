@@ -31,7 +31,7 @@ export function PeerVideo({
 
   // Attach remote stream to video element
   useEffect(() => {
-    if (remoteVideoRef.current && remoteStream) {
+    if (remoteVideoRef.current) {
       remoteVideoRef.current.srcObject = remoteStream;
     }
   }, [remoteStream]);
@@ -158,37 +158,35 @@ export function PeerVideo({
       {/* Chat messages — newest at bottom, auto-scroll */}
       <div
         ref={chatScrollRef}
-        className="h-28 px-4 py-2.5 flex flex-col-reverse gap-1 overflow-y-auto"
+        className="h-28 px-4 py-2.5 flex flex-col gap-1 overflow-y-auto"
         style={{ boxShadow: "0 -1px 0 color(display-p3 0 0 0 / 0.04)" }}
       >
-        <div className="flex flex-col gap-1">
-          <AnimatePresence initial={false}>
-            {messages.map((msg, i) => (
-              <motion.div
-                key={`${msg.text}-${i}`}
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.2, ease: EASE_OUT }}
-                className={`text-xs leading-relaxed ${
-                  msg.from === "system"
-                    ? "text-text-placeholder italic"
-                    : "text-text-secondary"
-                }`}
-              >
-                {msg.from === "peer" && (
-                  <span className="font-semibold text-accent-500 mr-1">
-                    Peer:
-                  </span>
-                )}
-                {msg.from === "you" && (
-                  <span className="font-semibold text-text mr-1">You:</span>
-                )}
-                {msg.text}
-              </motion.div>
-            ))}
-          </AnimatePresence>
-        </div>
+        <AnimatePresence initial={false}>
+          {messages.map((msg, i) => (
+            <motion.div
+              key={`${msg.text}-${i}`}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2, ease: EASE_OUT }}
+              className={`text-xs leading-relaxed ${
+                msg.from === "system"
+                  ? "text-text-placeholder italic"
+                  : "text-text-secondary"
+              }`}
+            >
+              {msg.from === "peer" && (
+                <span className="font-semibold text-accent-500 mr-1">
+                  Peer:
+                </span>
+              )}
+              {msg.from === "you" && (
+                <span className="font-semibold text-text mr-1">You:</span>
+              )}
+              {msg.text}
+            </motion.div>
+          ))}
+        </AnimatePresence>
       </div>
 
       {/* Chat input */}

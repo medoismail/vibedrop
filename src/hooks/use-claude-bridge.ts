@@ -4,70 +4,63 @@ import { useState, useEffect, useRef, useCallback } from "react";
 
 type BridgeState = "idle" | "thinking" | "done";
 
-const BRIDGE_WS_URL = "ws://localhost:3009";
-const RECONNECT_INTERVAL = 3000;
+// HTTP polling instead of WebSocket — avoids mixed content block
+// (HTTPS page can fetch() from http://localhost, but ws:// gets blocked)
+const BRIDGE_URL = "http://localhost:3009";
+const POLL_INTERVAL = 1500;
+const POLL_INTERVAL_FAST = 500; // faster polling when thinking
 
 export function useClaudeBridge() {
   const [state, setState] = useState<BridgeState>("idle");
   const [elapsed, setElapsed] = useState(0);
   const [connected, setConnected] = useState(false);
-  const wsRef = useRef<WebSocket | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval>>(undefined);
-  const reconnectRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const thinkingStartRef = useRef<number | null>(null);
+  const pollRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const mountedRef = useRef(true);
 
-  const connect = useCallback(() => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) return;
-
+  const poll = useCallback(async () => {
     try {
-      const ws = new WebSocket(BRIDGE_WS_URL);
+      const res = await fetch(`${BRIDGE_URL}/status`, {
+        signal: AbortSignal.timeout(2000),
+      });
+      if (!res.ok) throw new Error("not ok");
+      const data = await res.json();
 
-      ws.onopen = () => {
-        setConnected(true);
-        console.log("[vibe-talkes] Connected to bridge");
-      };
+      if (!mountedRef.current) return;
 
-      ws.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          if (data.type === "state") {
-            setState(data.state);
+      setConnected(true);
 
-            if (data.state === "thinking") {
-              thinkingStartRef.current = Date.now();
-              // Start local elapsed counter
-              if (timerRef.current) clearInterval(timerRef.current);
-              timerRef.current = setInterval(() => {
-                if (thinkingStartRef.current) {
-                  setElapsed(
-                    Math.round((Date.now() - thinkingStartRef.current) / 1000)
-                  );
-                }
-              }, 1000);
-            } else {
-              // Stop timer
-              if (timerRef.current) clearInterval(timerRef.current);
-              if (data.elapsed) setElapsed(data.elapsed);
-              thinkingStartRef.current = null;
+      const newState = data.state as BridgeState;
+      setState((prev) => {
+        if (prev === newState) return prev;
+
+        if (newState === "thinking") {
+          thinkingStartRef.current = Date.now();
+          if (timerRef.current) clearInterval(timerRef.current);
+          timerRef.current = setInterval(() => {
+            if (thinkingStartRef.current) {
+              setElapsed(
+                Math.round((Date.now() - thinkingStartRef.current) / 1000)
+              );
             }
-          }
-        } catch {}
-      };
+          }, 1000);
+        } else {
+          if (timerRef.current) clearInterval(timerRef.current);
+          if (data.elapsed) setElapsed(data.elapsed);
+          thinkingStartRef.current = null;
+        }
 
-      ws.onclose = () => {
-        setConnected(false);
-        wsRef.current = null;
-        // Reconnect
-        reconnectRef.current = setTimeout(connect, RECONNECT_INTERVAL);
-      };
+        return newState;
+      });
 
-      ws.onerror = () => {
-        ws.close();
-      };
-
-      wsRef.current = ws;
+      // Poll faster when thinking (more responsive stop detection)
+      const interval = newState === "thinking" ? POLL_INTERVAL_FAST : POLL_INTERVAL;
+      pollRef.current = setTimeout(poll, interval);
     } catch {
-      reconnectRef.current = setTimeout(connect, RECONNECT_INTERVAL);
+      if (!mountedRef.current) return;
+      setConnected(false);
+      pollRef.current = setTimeout(poll, POLL_INTERVAL);
     }
   }, []);
 
@@ -79,13 +72,14 @@ export function useClaudeBridge() {
   }, []);
 
   useEffect(() => {
-    connect();
+    mountedRef.current = true;
+    poll();
     return () => {
-      if (wsRef.current) wsRef.current.close();
+      mountedRef.current = false;
       if (timerRef.current) clearInterval(timerRef.current);
-      if (reconnectRef.current) clearTimeout(reconnectRef.current);
+      if (pollRef.current) clearTimeout(pollRef.current);
     };
-  }, [connect]);
+  }, [poll]);
 
   return {
     state,

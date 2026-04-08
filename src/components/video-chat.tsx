@@ -55,19 +55,19 @@ export function VideoChat({ elapsed }: Props) {
       start();
     }
     return () => {
-      if (confirmed) {
-        stop();
-        leave();
-      }
+      stop();
+      leave();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [confirmed]);
 
+  // Join once when camera is active (not on every stream change)
   useEffect(() => {
-    if (confirmed && isActive && stream) {
+    if (confirmed && isActive) {
       join();
     }
-  }, [confirmed, isActive, stream, join]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [confirmed, isActive]);
 
   // Play sounds on peer state changes
   useEffect(() => {
@@ -89,8 +89,7 @@ export function VideoChat({ elapsed }: Props) {
   };
 
   const handleLeave = () => {
-    stop();
-    leave();
+    // Just set confirmed to false — the cleanup effect handles stop() + leave()
     setConfirmed(false);
   };
 
