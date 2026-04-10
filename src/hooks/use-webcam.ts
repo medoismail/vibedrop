@@ -50,8 +50,8 @@ export function useWebcam() {
         }
         const newStream = await navigator.mediaDevices.getUserMedia({
           video: videoId
-            ? { deviceId: { exact: videoId } }
-            : { width: 640, height: 480, facingMode: "user" },
+            ? { deviceId: { exact: videoId }, frameRate: { ideal: 24, max: 30 } }
+            : { width: 640, height: 480, facingMode: "user", frameRate: { ideal: 24, max: 30 } },
           audio: audioId ? { deviceId: { exact: audioId } } : true,
         });
         streamRef.current = newStream;

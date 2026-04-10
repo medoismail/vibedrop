@@ -44,18 +44,36 @@ function unpair(ws) {
   if (peer) {
     peers.delete(ws);
     peers.delete(peer);
-    send(peer, { type: "peer-left" });
+    if (peer.readyState === 1) {
+      send(peer, { type: "peer-left" });
+    } else if (peer.readyState === 2) {
+      // CLOSING — force terminate so client gets close event
+      peer.terminate();
+    }
     return peer;
   }
   return null;
 }
 
-function tryMatch(ws) {
+/**
+ * @param {import('ws').WebSocket} ws
+ * @param {import('ws').WebSocket | null} [excludePeer] - prevent re-matching with this peer
+ */
+function tryMatch(ws, excludePeer = null) {
+  // Guard: if ws was already paired by a concurrent handler, bail
+  if (peers.has(ws)) return;
   removeFromQueue(ws);
 
   while (waitingQueue.length > 0) {
     const candidate = waitingQueue.shift();
-    if (candidate.readyState !== 1 || candidate === ws) continue;
+    if (
+      candidate.readyState !== 1 ||
+      candidate === ws ||
+      candidate === excludePeer ||
+      peers.has(candidate)
+    ) {
+      continue;
+    }
 
     peers.set(ws, candidate);
     peers.set(candidate, ws);
@@ -63,20 +81,26 @@ function tryMatch(ws) {
     send(ws, { type: "matched", initiator: true });
     send(candidate, { type: "matched", initiator: false });
 
-    console.log(`[match] paired (${peers.size / 2} active pairs, ${waitingQueue.length} waiting)`);
+    if (process.env.NODE_ENV !== "production") {
+      console.log(`[match] paired (${peers.size / 2} active pairs, ${waitingQueue.length} waiting)`);
+    }
     return;
   }
 
   waitingQueue.push(ws);
   send(ws, { type: "waiting" });
-  console.log(`[match] queued (${waitingQueue.length} waiting)`);
+  if (process.env.NODE_ENV !== "production") {
+    console.log(`[match] queued (${waitingQueue.length} waiting)`);
+  }
 }
 
 function handleDisconnect(ws) {
   allClients.delete(ws);
   removeFromQueue(ws);
   unpair(ws);
-  console.log(`[ws] disconnected (${allClients.size} clients)`);
+  if (process.env.NODE_ENV !== "production") {
+    console.log(`[ws] disconnected (${allClients.size} clients)`);
+  }
 }
 
 // ─── Rate limiting ───
@@ -107,12 +131,28 @@ setInterval(() => {
   }
 }, 300_000);
 
+// ─── Security ───
+
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || "https://vibedrop.pro")
+  .split(",")
+  .map((o) => o.trim());
+
+const SECURITY_HEADERS = {
+  "X-Content-Type-Options": "nosniff",
+  "X-Frame-Options": "DENY",
+  "Referrer-Policy": "no-referrer",
+};
+
 // ─── HTTP server ───
 
 const server = createServer((req, res) => {
-  res.setHeader("Access-Control-Allow-Origin", "*");
+  const origin = req.headers.origin;
+  if (origin && ALLOWED_ORIGINS.includes(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+  }
   res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  for (const [k, v] of Object.entries(SECURITY_HEADERS)) res.setHeader(k, v);
 
   if (req.method === "OPTIONS") {
     res.writeHead(204);
@@ -123,6 +163,12 @@ const server = createServer((req, res) => {
   const url = new URL(req.url, `http://localhost:${PORT}`);
 
   if (req.method === "GET" && url.pathname === "/status") {
+    const token = req.headers.authorization?.split(" ")[1];
+    if (process.env.STATUS_TOKEN && token !== process.env.STATUS_TOKEN) {
+      res.writeHead(401, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Unauthorized" }));
+      return;
+    }
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(
       JSON.stringify({
@@ -150,8 +196,16 @@ const wss = new WebSocketServer({ server });
 
 wss.on("connection", (ws, req) => {
   ws._remoteAddress = req.socket.remoteAddress;
+  ws.isAlive = true;
   allClients.add(ws);
-  console.log(`[ws] connected (${allClients.size} clients)`);
+
+  ws.on("pong", () => {
+    ws.isAlive = true;
+  });
+
+  if (process.env.NODE_ENV !== "production") {
+    console.log(`[ws] connected (${allClients.size} clients)`);
+  }
 
   ws.on("message", (raw) => {
     if (isRateLimited(ws)) {
@@ -184,17 +238,24 @@ wss.on("connection", (ws, req) => {
 
       case "chat": {
         const peer = peers.get(ws);
-        if (peer) send(peer, { type: "chat", text: msg.text });
+        if (
+          peer &&
+          typeof msg.text === "string" &&
+          msg.text.length > 0 &&
+          msg.text.length <= 500
+        ) {
+          send(peer, { type: "chat", text: msg.text.trim() });
+        }
         break;
       }
 
       case "skip": {
         const oldPeer = unpair(ws);
         removeFromQueue(ws);
-        tryMatch(ws);
-        if (oldPeer && oldPeer.readyState === 1) {
+        tryMatch(ws, oldPeer);
+        if (oldPeer && oldPeer.readyState === 1 && !peers.has(oldPeer)) {
           removeFromQueue(oldPeer);
-          tryMatch(oldPeer);
+          tryMatch(oldPeer, ws);
         }
         break;
       }
@@ -204,12 +265,35 @@ wss.on("connection", (ws, req) => {
         removeFromQueue(ws);
         break;
       }
+
+      // Client keepalive — ignore silently
+      case "ping":
+        break;
     }
   });
 
   ws.on("close", () => handleDisconnect(ws));
   ws.on("error", () => handleDisconnect(ws));
 });
+
+// ─── Heartbeat — detect zombie connections ───
+
+const HEARTBEAT_INTERVAL = 30_000;
+
+const heartbeat = setInterval(() => {
+  for (const ws of wss.clients) {
+    if (!ws.isAlive) {
+      ws.terminate();
+      continue;
+    }
+    ws.isAlive = false;
+    ws.ping();
+  }
+}, HEARTBEAT_INTERVAL);
+
+wss.on("close", () => clearInterval(heartbeat));
+
+// ─── Start ───
 
 server.listen(PORT, "0.0.0.0", () => {
   console.log(`\n  VibeDrop Signaling Server`);

@@ -1,19 +1,16 @@
 #!/usr/bin/env node
 
 /**
- * VibeDrop — Claude Code Hook Setup
- * Adds hooks that signal the bridge AND switch windows.
+ * VibeDrop — Claude Code Hook Setup (standalone)
+ *
+ * NOTE: Prefer using `npx vibetalkes` which handles the full lifecycle
+ * (install hooks on start, remove on exit). This script is kept for
+ * backward compatibility but now uses the same PID-guarded approach.
  *
  * Usage:  npm run setup
- *
- * What it does:
- *   1. Removes any old VibeDrop hooks (including ones with wrong event names)
- *   2. Adds PreToolUse hook  → POST /start + open vibedrop.pro/app
- *   3. Adds Stop hook        → POST /stop  + focus calling app
  */
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
-import { execSync } from "node:child_process";
 import { join } from "node:path";
 import { homedir, platform } from "node:os";
 
@@ -21,78 +18,29 @@ const CLAUDE_DIR = join(homedir(), ".claude");
 const SETTINGS_PATH = join(CLAUDE_DIR, "settings.json");
 const VIBEDROP_URL = "https://www.vibedrop.pro/app";
 const BRIDGE_PORT = 3009;
+const PID_FILE = "/tmp/vibedrop.pid";
+const FLAG_FILE = "/tmp/vibedrop-open";
 
-function detectCallingApp() {
-  // Detect which app the user runs Claude from
-  const term = process.env.TERM_PROGRAM || "";
-  if (term.includes("iTerm")) return "iTerm2";
-  if (term.includes("ghostty") || term.includes("Ghostty")) return "Ghostty";
-  if (term.includes("WezTerm")) return "WezTerm";
-  if (term.includes("vscode") || term.includes("VSCode")) return "Visual Studio Code";
-  if (term.includes("cursor") || term.includes("Cursor")) return "Cursor";
-  // Check if running from Claude Desktop app
-  if (process.ppid) {
-    try {
-      const ppName = execSync(`ps -p ${process.ppid} -o comm=`, { encoding: "utf-8" }).trim();
-      if (ppName.includes("Claude")) return "Claude";
-    } catch {}
-  }
-  return "Terminal";
-}
-
-const callingApp = detectCallingApp();
 const isMac = platform() === "darwin";
-const isLinux = platform() === "linux";
+
+// PID guard: only fire if vibedrop.pid exists AND the process is alive
+const pidGuard = `[ -f ${PID_FILE} ] && kill -0 $(cat ${PID_FILE}) 2>/dev/null`;
 
 function buildStartCommand() {
-  // Signal bridge + open browser ONCE per thinking session (flag file prevents duplicates)
   const curl = `curl -s -m 2 -X POST http://localhost:${BRIDGE_PORT}/start > /dev/null 2>&1`;
   if (isMac) {
-    return `${curl}; if [ ! -f /tmp/vibedrop-open ]; then touch /tmp/vibedrop-open; open '${VIBEDROP_URL}'; fi; true`;
+    return `if ${pidGuard} && ${curl}; then if [ ! -f ${FLAG_FILE} ]; then touch ${FLAG_FILE}; open '${VIBEDROP_URL}'; fi; fi; true`;
   }
-  if (isLinux) {
-    return `${curl}; if [ ! -f /tmp/vibedrop-open ]; then touch /tmp/vibedrop-open; xdg-open '${VIBEDROP_URL}'; fi; true`;
-  }
-  return `${curl}; true`;
+  return `if ${pidGuard} && ${curl}; then if [ ! -f ${FLAG_FILE} ]; then touch ${FLAG_FILE}; xdg-open '${VIBEDROP_URL}'; fi; fi; true`;
 }
 
 function buildStopCommand() {
   const curl = `curl -s -m 2 -X POST http://localhost:${BRIDGE_PORT}/stop > /dev/null 2>&1`;
-  const closeScript = join(import.meta.dirname, "close-vibedrop.sh");
   if (isMac) {
-    return `${curl}; ${closeScript}; open -a '${callingApp}' 2>/dev/null; true`;
+    return `if [ -f ${FLAG_FILE} ] && ${pidGuard}; then ${curl}; rm -f ${FLAG_FILE}; fi; true`;
   }
-  // Linux/Windows — signal bridge + remove flag
-  return `${curl}; rm -f /tmp/vibedrop-open; true`;
+  return `if [ -f ${FLAG_FILE} ] && ${pidGuard}; then ${curl}; rm -f ${FLAG_FILE}; fi; true`;
 }
-
-const HOOKS = {
-  PreToolUse: [
-    {
-      matcher: "",
-      hooks: [
-        {
-          type: "command",
-          command: buildStartCommand(),
-        },
-      ],
-    },
-  ],
-  Stop: [
-    {
-      matcher: "",
-      hooks: [
-        {
-          type: "command",
-          command: buildStopCommand(),
-        },
-      ],
-    },
-  ],
-};
-
-// Old invalid event names that need cleaning up
-const STALE_EVENTS = ["PreToolCall", "PostToolCall"];
 
 function main() {
   if (!existsSync(CLAUDE_DIR)) mkdirSync(CLAUDE_DIR, { recursive: true });
@@ -108,42 +56,47 @@ function main() {
 
   if (!settings.hooks) settings.hooks = {};
 
-  // Clean up old hooks with wrong event names (PreToolCall, PostToolCall)
-  for (const stale of STALE_EVENTS) {
-    if (settings.hooks[stale]) {
-      settings.hooks[stale] = settings.hooks[stale].filter(
-        (r) => !r.hooks?.some((h) => h.command?.includes(`localhost:${BRIDGE_PORT}`))
+  // Clean up ALL old VibeDrop hooks (any format, any event)
+  for (const event of Object.keys(settings.hooks)) {
+    if (settings.hooks[event]) {
+      settings.hooks[event] = settings.hooks[event].filter(
+        (r) =>
+          !r.hooks?.some(
+            (h) =>
+              h.command?.includes(`localhost:${BRIDGE_PORT}`) ||
+              h.command?.includes("vibedrop")
+          )
       );
-      // Remove the key entirely if empty
-      if (settings.hooks[stale].length === 0) {
-        delete settings.hooks[stale];
-        console.log(`  - Removed invalid ${stale} hook`);
+      if (settings.hooks[event].length === 0) {
+        delete settings.hooks[event];
+        console.log(`  - Cleaned up old ${event} hook`);
       }
     }
   }
 
-  // Remove old VibeDrop hooks from correct events, then add new ones
-  for (const event of Object.keys(HOOKS)) {
-    if (settings.hooks[event]) {
-      settings.hooks[event] = settings.hooks[event].filter(
-        (r) => !r.hooks?.some((h) => h.command?.includes(`localhost:${BRIDGE_PORT}`))
-      );
-    } else {
-      settings.hooks[event] = [];
-    }
+  // Add new PID-guarded hooks
+  const hooks = {
+    UserPromptSubmit: {
+      matcher: "",
+      hooks: [{ type: "command", command: buildStartCommand() }],
+    },
+    Stop: {
+      matcher: "",
+      hooks: [{ type: "command", command: buildStopCommand() }],
+    },
+  };
 
-    settings.hooks[event].push(...HOOKS[event]);
-    console.log(`  + ${event} hook configured`);
+  for (const [event, rule] of Object.entries(hooks)) {
+    if (!settings.hooks[event]) settings.hooks[event] = [];
+    settings.hooks[event].push(rule);
+    console.log(`  + ${event} hook configured (PID-guarded)`);
   }
 
   writeFileSync(SETTINGS_PATH, JSON.stringify(settings, null, 2) + "\n");
 
   console.log(`\n  Hooks saved to ${SETTINGS_PATH}`);
-  console.log(`  Detected app: ${callingApp}`);
-  console.log(`  Platform: ${platform()}`);
-  console.log(`\n  Flow:`);
-  console.log(`  Claude thinks → browser opens ${VIBEDROP_URL}`);
-  console.log(`  Claude done   → ${callingApp} comes back to front\n`);
+  console.log(`\n  These hooks only fire when the VibeDrop CLI is running.`);
+  console.log(`  Start with: npx vibetalkes\n`);
 }
 
 main();

@@ -99,7 +99,7 @@ export default function Home() {
                       npx vibedrop
                     </code>
                     <span className="text-[10px] text-text-disabled">
-                      Sets up hooks, starts the bridge, and opens VibeDrop
+                      One command, handles everything
                     </span>
                   </motion.div>
                 )}
@@ -125,7 +125,7 @@ export default function Home() {
                   {[
                     { icon: "M15 10l4.553-2.276A1 1 0 0 1 21 8.618v6.764a1 1 0 0 1-1.447.894L15 14v-4z M3 8a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8z", label: "P2P Video" },
                     { icon: "M12 15v2m-6 4h12a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2zm10-10V7a4 4 0 0 0-8 0v4h8z", label: "Private" },
-                    { icon: "M4.318 6.318a4.5 4.5 0 0 0 0 6.364L12 20.364l7.682-7.682a4.5 4.5 0 0 0-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 0 0-6.364 0z", label: "Good vibes" },
+                    { icon: "M4.318 6.318a4.5 4.5 0 0 0 0 6.364L12 20.364l7.682-7.682a4.5 4.5 0 0 0-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 0 0-6.364 0z", label: "Dev only" },
                   ].map((item, i) => (
                     <motion.div
                       key={item.label}
@@ -151,7 +151,7 @@ export default function Home() {
                   className="flex flex-col items-center gap-1.5 mt-1"
                 >
                   <p className="text-[10px] text-text-disabled leading-relaxed text-center">
-                    A peaceful space for devs waiting on AI. Be kind, be chill, spread good vibes only.
+                    A space for devs waiting on AI. Be respectful, keep it chill.
                   </p>
                   <button
                     onClick={() => setShowTerms(true)}

@@ -115,7 +115,7 @@ export function AnimatedDemo({ trigger, onComplete }: Props) {
                 <polyline points="12 5 19 12 12 19" />
               </svg>
               <span className="text-[9px] text-text-placeholder font-medium">
-                Click npx vibetalkes to preview
+                Click to see how it works
               </span>
             </motion.div>
           </motion.div>

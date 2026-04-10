@@ -7,10 +7,21 @@
  *   npx vibetalkes          → setup hooks + start bridge + open browser
  *   npx vibetalkes setup    → only install Claude Code hooks
  *   npx vibetalkes bridge   → only start the bridge server
+ *
+ * Lifecycle:
+ *   - Hooks are installed on start and removed on exit (SIGINT, SIGTERM, crash).
+ *   - A PID file (/tmp/vibedrop.pid) acts as a guard — hook commands check it
+ *     before opening the browser. If the PID is dead, hooks become no-ops.
  */
 
 import { createServer } from "node:http";
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
+import {
+  readFileSync,
+  writeFileSync,
+  mkdirSync,
+  existsSync,
+  unlinkSync,
+} from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { exec } from "node:child_process";
@@ -18,7 +29,9 @@ import { WebSocketServer } from "ws";
 
 const APP_URL = "https://vibedrop.pro/app";
 const PORT = 3009;
-const VERSION = "0.1.0";
+const VERSION = "0.1.1";
+const PID_FILE = "/tmp/vibedrop.pid";
+const FLAG_FILE = "/tmp/vibedrop-open";
 
 // ─── Colors ───
 
@@ -55,93 +68,131 @@ function detectTerminal() {
   return "Terminal";
 }
 
-// ─── Hook Setup ───
+// ─── PID file management ───
 
-function setupHooks() {
-  const claudeDir = join(homedir(), ".claude");
-  const settingsPath = join(claudeDir, "settings.json");
+function writePidFile() {
+  writeFileSync(PID_FILE, String(process.pid));
+}
 
-  if (!existsSync(claudeDir)) {
-    mkdirSync(claudeDir, { recursive: true });
-  }
+function removePidFile() {
+  try {
+    unlinkSync(PID_FILE);
+  } catch {}
+}
 
-  let settings = {};
-  if (existsSync(settingsPath)) {
+function removeFlagFile() {
+  try {
+    unlinkSync(FLAG_FILE);
+  } catch {}
+}
+
+// ─── Hook Setup & Teardown ───
+
+const CLAUDE_DIR = join(homedir(), ".claude");
+const SETTINGS_PATH = join(CLAUDE_DIR, "settings.json");
+
+function readSettings() {
+  if (!existsSync(CLAUDE_DIR)) mkdirSync(CLAUDE_DIR, { recursive: true });
+  if (existsSync(SETTINGS_PATH)) {
     try {
-      settings = JSON.parse(readFileSync(settingsPath, "utf-8"));
-    } catch {
-      settings = {};
-    }
+      return JSON.parse(readFileSync(SETTINGS_PATH, "utf-8"));
+    } catch {}
   }
+  return {};
+}
 
+function writeSettings(settings) {
+  writeFileSync(SETTINGS_PATH, JSON.stringify(settings, null, 2) + "\n");
+}
+
+/** Check if a VibeDrop hook command */
+function isVibedropHook(rule) {
+  return rule.hooks?.some((h) => h.command?.includes("vibedrop.pid"));
+}
+
+function installHooks() {
+  const settings = readSettings();
   if (!settings.hooks) settings.hooks = {};
 
   const callingApp = detectTerminal();
-
-  // macOS: use AppleScript to reuse existing tab (no duplicates)
-  // Linux: use xdg-open with flag file
   const isMac = process.platform === "darwin";
 
-  // Only open browser if bridge is actually running (curl succeeds)
-  // Only close tab + switch app if vibedrop-open flag exists
+  // PID guard: only fire if vibedrop.pid exists AND the process is alive
+  const pidGuard = `[ -f ${PID_FILE} ] && kill -0 $(cat ${PID_FILE}) 2>/dev/null`;
+
   const startCmd = isMac
-    ? `if curl -s -m 1 -X POST http://localhost:${PORT}/start > /dev/null 2>&1; then if [ ! -f /tmp/vibedrop-open ]; then touch /tmp/vibedrop-open; osascript -e 'tell application "Google Chrome" to activate' -e 'tell application "Google Chrome"' -e 'set found to false' -e 'repeat with w in windows' -e 'set tabIndex to 0' -e 'repeat with t in tabs of w' -e 'set tabIndex to tabIndex + 1' -e 'if URL of t contains "vibedrop.pro" then' -e 'set active tab index of w to tabIndex' -e 'set found to true' -e 'exit repeat' -e 'end if' -e 'end repeat' -e 'if found then exit repeat' -e 'end repeat' -e 'if not found then open location "https://www.vibedrop.pro/app"' -e 'end tell' 2>/dev/null; fi; fi; true`
-    : `if curl -s -m 1 -X POST http://localhost:${PORT}/start > /dev/null 2>&1; then if [ ! -f /tmp/vibedrop-open ]; then touch /tmp/vibedrop-open; xdg-open 'https://www.vibedrop.pro/app' 2>/dev/null; fi; fi; true`;
+    ? `if ${pidGuard} && curl -s -m 1 -X POST http://localhost:${PORT}/start > /dev/null 2>&1; then if [ ! -f ${FLAG_FILE} ]; then touch ${FLAG_FILE}; osascript -e 'tell application "Google Chrome" to activate' -e 'tell application "Google Chrome"' -e 'set found to false' -e 'repeat with w in windows' -e 'set tabIndex to 0' -e 'repeat with t in tabs of w' -e 'set tabIndex to tabIndex + 1' -e 'if URL of t contains "vibedrop.pro" then' -e 'set active tab index of w to tabIndex' -e 'set found to true' -e 'exit repeat' -e 'end if' -e 'end repeat' -e 'if found then exit repeat' -e 'end repeat' -e 'if not found then open location "https://www.vibedrop.pro/app"' -e 'end tell' 2>/dev/null; fi; fi; true`
+    : `if ${pidGuard} && curl -s -m 1 -X POST http://localhost:${PORT}/start > /dev/null 2>&1; then if [ ! -f ${FLAG_FILE} ]; then touch ${FLAG_FILE}; xdg-open 'https://www.vibedrop.pro/app' 2>/dev/null; fi; fi; true`;
 
   const stopCmd = isMac
-    ? `if [ -f /tmp/vibedrop-open ]; then curl -s -m 1 -X POST http://localhost:${PORT}/stop > /dev/null 2>&1; rm -f /tmp/vibedrop-open; osascript -e 'tell application "Google Chrome"' -e 'repeat with w in windows' -e 'set tabCount to count of tabs of w' -e 'repeat with i from tabCount to 1 by -1' -e 'if URL of tab i of w contains "vibedrop.pro" then' -e 'delete tab i of w' -e 'end if' -e 'end repeat' -e 'end repeat' -e 'end tell' 2>/dev/null; open -a '${callingApp}' 2>/dev/null; fi; true`
-    : `if [ -f /tmp/vibedrop-open ]; then curl -s -m 1 -X POST http://localhost:${PORT}/stop > /dev/null 2>&1; rm -f /tmp/vibedrop-open; fi; true`;
+    ? `if [ -f ${FLAG_FILE} ] && ${pidGuard}; then curl -s -m 1 -X POST http://localhost:${PORT}/stop > /dev/null 2>&1; rm -f ${FLAG_FILE}; osascript -e 'tell application "Google Chrome"' -e 'repeat with w in windows' -e 'set tabCount to count of tabs of w' -e 'repeat with i from tabCount to 1 by -1' -e 'if URL of tab i of w contains "vibedrop.pro" then' -e 'delete tab i of w' -e 'end if' -e 'end repeat' -e 'end repeat' -e 'end tell' 2>/dev/null; open -a '${callingApp}' 2>/dev/null; fi; true`
+    : `if [ -f ${FLAG_FILE} ] && ${pidGuard}; then curl -s -m 1 -X POST http://localhost:${PORT}/stop > /dev/null 2>&1; rm -f ${FLAG_FILE}; fi; true`;
 
-  const hooksConfig = {
-    UserPromptSubmit: {
-      matcher: "",
-      hooks: [{ type: "command", command: startCmd }],
-    },
-    Stop: {
-      matcher: "",
-      hooks: [{ type: "command", command: stopCmd }],
-    },
-  };
-
-  // Clean up old invalid hook keys (PreToolCall, PostToolCall, PreToolUse)
-  for (const stale of ["PreToolCall", "PostToolCall", "PreToolUse"]) {
-    if (settings.hooks[stale]) {
-      settings.hooks[stale] = settings.hooks[stale].filter(
-        (r) => !r.hooks?.some((h) => h.command?.includes(`localhost:${PORT}`))
+  // Clean up ALL old VibeDrop hooks (any format)
+  for (const event of Object.keys(settings.hooks)) {
+    if (settings.hooks[event]) {
+      settings.hooks[event] = settings.hooks[event].filter(
+        (r) =>
+          !r.hooks?.some(
+            (h) =>
+              h.command?.includes(`localhost:${PORT}`) ||
+              h.command?.includes("vibedrop")
+          )
       );
-      if (settings.hooks[stale].length === 0) {
-        delete settings.hooks[stale];
-        log(`${c.dim}- Removed old ${stale} hook${c.reset}`);
-      }
+      if (settings.hooks[event].length === 0) delete settings.hooks[event];
     }
   }
 
-  let added = 0;
+  // Install new hooks
+  if (!settings.hooks.UserPromptSubmit) settings.hooks.UserPromptSubmit = [];
+  settings.hooks.UserPromptSubmit.push({
+    matcher: "",
+    hooks: [{ type: "command", command: startCmd }],
+  });
 
-  for (const [event, rule] of Object.entries(hooksConfig)) {
-    if (!settings.hooks[event]) settings.hooks[event] = [];
+  if (!settings.hooks.Stop) settings.hooks.Stop = [];
+  settings.hooks.Stop.push({
+    matcher: "",
+    hooks: [{ type: "command", command: stopCmd }],
+  });
 
-    // Remove old VibeDrop hooks from this event
-    settings.hooks[event] = settings.hooks[event].filter(
-      (r) => !r.hooks?.some((h) => h.command?.includes(`localhost:${PORT}`))
-    );
+  writeSettings(settings);
+  log(`${c.green}+${c.reset} Hooks installed ${c.dim}(PID-guarded)${c.reset}`);
+}
 
-    settings.hooks[event].push(rule);
-    added++;
-    log(`${c.green}+${c.reset} Added ${c.bold}${event}${c.reset} hook`);
-  }
+function removeHooks() {
+  try {
+    const settings = readSettings();
+    if (!settings.hooks) return;
 
-  writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + "\n");
+    let changed = false;
+    for (const event of Object.keys(settings.hooks)) {
+      const before = settings.hooks[event]?.length || 0;
+      if (settings.hooks[event]) {
+        settings.hooks[event] = settings.hooks[event].filter(
+          (r) =>
+            !r.hooks?.some(
+              (h) =>
+                h.command?.includes(`localhost:${PORT}`) ||
+                h.command?.includes("vibedrop")
+            )
+        );
+        if (settings.hooks[event].length === 0) delete settings.hooks[event];
+        if ((settings.hooks[event]?.length || 0) !== before) changed = true;
+      }
+    }
 
-  if (added > 0) {
-    log(`${c.green}${c.bold}Hooks installed${c.reset} ${c.dim}(${settingsPath})${c.reset}`);
-    console.log();
-    log(`${c.orange}${c.bold}⚡ Restart your Claude session${c.reset} for hooks to take effect.`);
-    log(`${c.dim}Close the current Claude Code or Desktop session and start a new one.${c.reset}`);
-  } else {
-    log(`${c.dim}Hooks already configured${c.reset}`);
-  }
-  console.log();
+    if (changed) {
+      writeSettings(settings);
+    }
+  } catch {}
+}
+
+/** Clean up everything on exit */
+function cleanup() {
+  removePidFile();
+  removeFlagFile();
+  removeHooks();
 }
 
 // ─── Bridge Server ───
@@ -223,12 +274,12 @@ function startBridge() {
   function tryMatch(ws) {
     removeFromQueue(ws);
     while (waitingQueue.length > 0) {
-      const c = waitingQueue.shift();
-      if (c.readyState !== 1 || c === ws) continue;
-      peers.set(ws, c);
-      peers.set(c, ws);
+      const candidate = waitingQueue.shift();
+      if (candidate.readyState !== 1 || candidate === ws) continue;
+      peers.set(ws, candidate);
+      peers.set(candidate, ws);
       send(ws, { type: "matched", initiator: true });
-      send(c, { type: "matched", initiator: false });
+      send(candidate, { type: "matched", initiator: false });
       return;
     }
     waitingQueue.push(ws);
@@ -332,7 +383,14 @@ function startBridge() {
         }
         case "chat": {
           const p2 = peers.get(ws);
-          if (p2) send(p2, { type: "chat", text: msg.text });
+          if (
+            p2 &&
+            typeof msg.text === "string" &&
+            msg.text.length > 0 &&
+            msg.text.length <= 500
+          ) {
+            send(p2, { type: "chat", text: msg.text.trim() });
+          }
           break;
         }
         case "skip": {
@@ -358,9 +416,7 @@ function startBridge() {
 
   server.on("error", (err) => {
     if (err.code === "EADDRINUSE") {
-      log(
-        `${c.dim}Bridge already running on port ${PORT}${c.reset}`
-      );
+      log(`${c.dim}Bridge already running on port ${PORT}${c.reset}`);
       return;
     }
     throw err;
@@ -370,9 +426,7 @@ function startBridge() {
     log(
       `${c.green}${c.bold}Bridge running${c.reset} ${c.dim}on port ${PORT}${c.reset}`
     );
-    log(
-      `${c.dim}WebSocket: ws://localhost:${PORT}${c.reset}`
-    );
+    log(`${c.dim}WebSocket: ws://localhost:${PORT}${c.reset}`);
     console.log();
   });
 }
@@ -392,6 +446,30 @@ function openBrowser(url) {
   console.log();
 }
 
+// ─── Register exit handlers ───
+
+let cleanedUp = false;
+function safeCleanup(code) {
+  if (cleanedUp) return;
+  cleanedUp = true;
+  cleanup();
+  process.exit(code ?? 0);
+}
+
+process.on("SIGINT", () => safeCleanup(0));
+process.on("SIGTERM", () => safeCleanup(0));
+process.on("exit", () => {
+  // exit handler can't be async — just do sync cleanup
+  if (!cleanedUp) {
+    cleanedUp = true;
+    cleanup();
+  }
+});
+process.on("uncaughtException", (err) => {
+  console.error(err);
+  safeCleanup(1);
+});
+
 // ─── Main ───
 
 const command = process.argv[2];
@@ -399,14 +477,19 @@ const command = process.argv[2];
 banner();
 
 if (command === "setup") {
-  setupHooks();
+  writePidFile();
+  installHooks();
+  console.log();
   log(`${c.dim}Now run: ${c.reset}${c.bold}npx vibetalkes${c.reset}`);
   console.log();
+  // Don't clean up here — setup-only mode leaves hooks for the main command
 } else if (command === "bridge") {
+  writePidFile();
   startBridge();
 } else {
   // Default: setup + bridge + open browser
-  setupHooks();
+  writePidFile();
+  installHooks();
   startBridge();
 
   // Wait a tick for server to start, then open browser
@@ -417,7 +500,7 @@ if (command === "setup") {
     log(`${c.dim}2. Use Claude Code in another terminal${c.reset}`);
     log(`${c.dim}3. Video chat activates when Claude thinks${c.reset}`);
     console.log();
-    log(`${c.dim}Press Ctrl+C to stop${c.reset}`);
+    log(`${c.dim}Press Ctrl+C to stop (hooks auto-removed)${c.reset}`);
     console.log();
   }, 500);
 }

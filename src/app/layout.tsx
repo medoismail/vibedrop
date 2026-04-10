@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "VibeDrop — Talk to Devs While Claude Codes",
+  title: "VibeDrop — Claude's Busy. Meet Someone.",
   description:
-    "Claude's busy building your code. Don't just wait — hop into a quick video chat with another dev. Automatic. Private. Free forever.",
+    "Video chat with another dev while Claude writes your code. Automatic matching, peer-to-peer, completely private. Free forever.",
   keywords: [
     "vibedrop",
     "vibe coding",
@@ -23,15 +23,15 @@ export const metadata: Metadata = {
   alternates: { canonical: "/" },
   icons: { icon: "/logo.svg", apple: "/logo.svg" },
   openGraph: {
-    title: "VibeDrop — Claude's Busy. You Don't Have to Be.",
+    title: "VibeDrop — Claude's Busy. Meet Someone.",
     description:
-      "Video chats with fellow devs that only activate when AI is thinking. When the code is ready, you're back. No tabs, no switching.",
+      "Video chat with devs while AI writes your code. Activates automatically, closes when it's done.",
     type: "website",
     url: "https://vibedrop.pro",
     siteName: "VibeDrop",
     images: [
       {
-        url: "/thumbnail-vibetalk.png",
+        url: "/thumbnail-vibetalk.jpg",
         width: 1200,
         height: 630,
         alt: "VibeDrop — Talk to devs while Claude codes",
@@ -41,10 +41,10 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "VibeDrop — Claude's Busy. You Don't Have to Be.",
+    title: "VibeDrop — Claude's Busy. Meet Someone.",
     description:
-      "Video chat with another dev while your code builds. Automatic, private, free.",
-    images: ["/thumbnail-vibetalk.png"],
+      "Video chat with devs while AI writes your code. Automatic, private, free.",
+    images: ["/thumbnail-vibetalk.jpg"],
     creator: "@vibedrop",
   },
   robots: {

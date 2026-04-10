@@ -10,6 +10,11 @@ const BRIDGE_URL = "http://localhost:3009";
 const POLL_INTERVAL = 1500;
 const POLL_INTERVAL_FAST = 500; // faster polling when thinking
 
+/** Add ±30% random jitter to prevent thundering herd */
+function jitter(base: number): number {
+  return base + Math.random() * base * 0.3;
+}
+
 export function useClaudeBridge() {
   const [state, setState] = useState<BridgeState>("idle");
   const [elapsed, setElapsed] = useState(0);
@@ -56,11 +61,11 @@ export function useClaudeBridge() {
 
       // Poll faster when thinking (more responsive stop detection)
       const interval = newState === "thinking" ? POLL_INTERVAL_FAST : POLL_INTERVAL;
-      pollRef.current = setTimeout(poll, interval);
+      pollRef.current = setTimeout(poll, jitter(interval));
     } catch {
       if (!mountedRef.current) return;
       setConnected(false);
-      pollRef.current = setTimeout(poll, POLL_INTERVAL);
+      pollRef.current = setTimeout(poll, jitter(POLL_INTERVAL));
     }
   }, []);
 

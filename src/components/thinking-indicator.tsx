@@ -44,7 +44,7 @@ export function ThinkingIndicator({ elapsed }: Props) {
 
         <div className="flex flex-col gap-0.5">
           <span className="text-sm font-semibold text-text">
-            Your code is building
+            Claude is working
             <motion.span
               className="inline-block ml-0.5"
               animate={{ opacity: [1, 0.2, 1] }}

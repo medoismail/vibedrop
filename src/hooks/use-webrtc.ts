@@ -14,16 +14,40 @@ interface ChatMessage {
   from: "you" | "peer" | "system";
 }
 
+// ─── ICE servers: STUN + optional TURN fallback ───
+
 const ICE_SERVERS: RTCIceServer[] = [
   { urls: "stun:stun.l.google.com:19302" },
   { urls: "stun:stun1.l.google.com:19302" },
-  { urls: "stun:stun2.l.google.com:19302" },
+  // TURN fallback for users behind symmetric NATs / strict firewalls
+  // Supports comma-separated URLs (e.g., "turn:host:80,turns:host:443")
+  ...(process.env.NEXT_PUBLIC_TURN_URL
+    ? [
+        {
+          urls: process.env.NEXT_PUBLIC_TURN_URL.split(",").map((u) => u.trim()),
+          username: process.env.NEXT_PUBLIC_TURN_USERNAME ?? "",
+          credential: process.env.NEXT_PUBLIC_TURN_CREDENTIAL ?? "",
+        },
+      ]
+    : []),
 ];
 
 // Signaling server — deployed on Fly.io, shared by all users
-const WS_URL =
-  process.env.NEXT_PUBLIC_SIGNALING_URL ??
-  "wss://vibedrop-signaling.fly.dev";
+const WS_URL = (() => {
+  const url =
+    process.env.NEXT_PUBLIC_SIGNALING_URL ?? "wss://vibedrop-signaling.fly.dev";
+  if (typeof window !== "undefined" && !url.startsWith("wss://")) {
+    console.error("[security] Signaling URL must use wss:// — refusing to connect over insecure WebSocket");
+    return "";
+  }
+  return url;
+})();
+
+// ─── Reconnection constants ───
+
+const MAX_RECONNECT = 10;
+const BASE_DELAY = 1000;
+const MAX_DELAY = 30_000;
 
 export function useWebRTC(localStream: MediaStream | null) {
   const [peerState, setPeerState] = useState<PeerState>("idle");
@@ -35,10 +59,13 @@ export function useWebRTC(localStream: MediaStream | null) {
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const dcRef = useRef<RTCDataChannel | null>(null);
   const reconnectRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const reconnectAttemptRef = useRef(0);
   const isInitiatorRef = useRef(false);
   const localStreamRef = useRef(localStream);
   const iceCandidateQueue = useRef<RTCIceCandidateInit[]>([]);
+  const flushingRef = useRef(false);
   const hasJoinedRef = useRef(false);
+  const lastChatTimeRef = useRef(0);
 
   // Keep stream ref in sync
   useEffect(() => {
@@ -58,10 +85,12 @@ export function useWebRTC(localStream: MediaStream | null) {
     dc.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-        if (data.type === "chat") {
+        if (data.type === "chat" && typeof data.text === "string" && data.text.length <= 500) {
           setMessages((prev) => [...prev.slice(-20), { text: data.text, from: "peer" }]);
         }
-      } catch {}
+      } catch (err) {
+        console.warn("[datachannel] Invalid message:", err);
+      }
     };
     dc.onclose = () => { dcRef.current = null; };
   }
@@ -71,6 +100,7 @@ export function useWebRTC(localStream: MediaStream | null) {
     if (pcRef.current) { pcRef.current.close(); pcRef.current = null; }
     setRemoteStream(null);
     iceCandidateQueue.current = [];
+    flushingRef.current = false;
   }
 
   function createPC(): RTCPeerConnection {
@@ -84,6 +114,15 @@ export function useWebRTC(localStream: MediaStream | null) {
       for (const track of stream.getTracks()) {
         pc.addTrack(track, stream);
       }
+    }
+
+    // Cap video bitrate at 500kbps for 640x480
+    const videoSender = pc.getSenders().find((s) => s.track?.kind === "video");
+    if (videoSender) {
+      const params = videoSender.getParameters();
+      if (!params.encodings) params.encodings = [{}];
+      params.encodings[0].maxBitrate = 500_000;
+      videoSender.setParameters(params).catch(() => {});
     }
 
     pc.ontrack = (event) => {
@@ -104,6 +143,15 @@ export function useWebRTC(localStream: MediaStream | null) {
       }
     };
 
+    // Faster failure detection via ICE state
+    pc.oniceconnectionstatechange = () => {
+      if (pc.iceConnectionState === "failed") {
+        console.warn("[webrtc] ICE failed — closing connection");
+        closePeerConnection();
+        setPeerState("disconnected");
+      }
+    };
+
     if (isInitiatorRef.current) {
       const dc = pc.createDataChannel("chat");
       setupDataChannel(dc);
@@ -116,12 +164,20 @@ export function useWebRTC(localStream: MediaStream | null) {
   }
 
   async function flushIceCandidates(pc: RTCPeerConnection) {
-    const queued = iceCandidateQueue.current;
-    iceCandidateQueue.current = [];
-    for (const candidate of queued) {
-      try {
-        await pc.addIceCandidate(new RTCIceCandidate(candidate));
-      } catch {}
+    if (flushingRef.current) return;
+    flushingRef.current = true;
+    try {
+      // splice(0) is atomic from JS event loop perspective
+      const queued = iceCandidateQueue.current.splice(0);
+      for (const candidate of queued) {
+        try {
+          await pc.addIceCandidate(new RTCIceCandidate(candidate));
+        } catch (err) {
+          console.warn("[webrtc] flushIceCandidate error:", err);
+        }
+      }
+    } finally {
+      flushingRef.current = false;
     }
   }
 
@@ -159,6 +215,8 @@ export function useWebRTC(localStream: MediaStream | null) {
       }
 
       case "offer": {
+        const sdp = msg.sdp as Record<string, unknown> | undefined;
+        if (!sdp || typeof sdp !== "object" || !sdp.type || !sdp.sdp) break;
         const pc = pcRef.current ?? createPC();
         try {
           await pc.setRemoteDescription(
@@ -175,6 +233,8 @@ export function useWebRTC(localStream: MediaStream | null) {
       }
 
       case "answer": {
+        const sdp = msg.sdp as Record<string, unknown> | undefined;
+        if (!sdp || typeof sdp !== "object" || !sdp.type || !sdp.sdp) break;
         if (pcRef.current) {
           try {
             await pcRef.current.setRemoteDescription(
@@ -189,6 +249,7 @@ export function useWebRTC(localStream: MediaStream | null) {
       }
 
       case "ice": {
+        if (!msg.candidate || typeof msg.candidate !== "object") break;
         const candidate = msg.candidate as RTCIceCandidateInit;
         if (pcRef.current?.remoteDescription) {
           try {
@@ -217,37 +278,66 @@ export function useWebRTC(localStream: MediaStream | null) {
     }
   }, [wsSend]);
 
-  // ─── WebSocket connection (uses ref for handleSignal to avoid stale closure) ───
+  // ─── WebSocket connection with exponential backoff ───
 
   const handleSignalRef = useRef(handleSignal);
   useEffect(() => { handleSignalRef.current = handleSignal; }, [handleSignal]);
 
   const connectWs = useCallback(() => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) return;
+    // Clean up old socket to prevent duplicate listeners
+    if (wsRef.current) {
+      wsRef.current.onclose = null;
+      wsRef.current.onerror = null;
+      wsRef.current.onmessage = null;
+      wsRef.current.close();
+      wsRef.current = null;
+    }
+
+    if (!WS_URL) return;
 
     try {
       const ws = new WebSocket(WS_URL);
 
-      ws.onopen = () => setWsConnected(true);
+      ws.onopen = () => {
+        setWsConnected(true);
+        reconnectAttemptRef.current = 0;
+      };
 
       ws.onmessage = (event) => {
         let msg;
         try { msg = JSON.parse(event.data); } catch { return; }
-        // Use ref to always call the latest handleSignal
         handleSignalRef.current(msg);
       };
 
       ws.onclose = () => {
         setWsConnected(false);
         wsRef.current = null;
-        reconnectRef.current = setTimeout(connectWs, 3000);
+
+        // If we were connected to a peer, treat WS close as implicit peer-left
+        if (pcRef.current) {
+          closePeerConnection();
+          setPeerState("disconnected");
+        }
+
+        // Exponential backoff with jitter
+        const attempt = reconnectAttemptRef.current++;
+        if (attempt < MAX_RECONNECT) {
+          const delay = Math.min(BASE_DELAY * 2 ** attempt, MAX_DELAY)
+            + Math.random() * 1000;
+          reconnectRef.current = setTimeout(connectWs, delay);
+        }
       };
 
       ws.onerror = () => ws.close();
 
       wsRef.current = ws;
     } catch {
-      reconnectRef.current = setTimeout(connectWs, 3000);
+      const attempt = reconnectAttemptRef.current++;
+      if (attempt < MAX_RECONNECT) {
+        const delay = Math.min(BASE_DELAY * 2 ** attempt, MAX_DELAY)
+          + Math.random() * 1000;
+        reconnectRef.current = setTimeout(connectWs, delay);
+      }
     }
   }, []);
 
@@ -295,12 +385,17 @@ export function useWebRTC(localStream: MediaStream | null) {
 
   const sendChat = useCallback(
     (text: string) => {
-      setMessages((prev) => [...prev.slice(-20), { text, from: "you" }]);
+      const now = Date.now();
+      if (now - lastChatTimeRef.current < 150) return; // rate limit: 150ms between messages
+      lastChatTimeRef.current = now;
+
+      const trimmed = text.slice(0, 500); // enforce max length client-side
+      setMessages((prev) => [...prev.slice(-20), { text: trimmed, from: "you" }]);
 
       if (dcRef.current?.readyState === "open") {
-        dcRef.current.send(JSON.stringify({ type: "chat", text }));
+        dcRef.current.send(JSON.stringify({ type: "chat", text: trimmed }));
       } else {
-        wsSend({ type: "chat", text });
+        wsSend({ type: "chat", text: trimmed });
       }
     },
     [wsSend]
