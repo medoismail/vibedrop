@@ -306,6 +306,10 @@ export function useWebRTC(localStream: MediaStream | null) {
       ws.onmessage = (event) => {
         let msg;
         try { msg = JSON.parse(event.data); } catch { return; }
+        if (msg.type === "shutdown") {
+          window.close();
+          return;
+        }
         handleSignalRef.current(msg);
       };
 

@@ -28,6 +28,10 @@ import { exec } from "node:child_process";
 import { WebSocketServer } from "ws";
 
 const APP_URL = "https://vibedrop.pro/app";
+
+// Module-level refs so cleanup can shut them down
+let _server = null;
+let _wss = null;
 const PORT = 3009;
 const VERSION = "0.1.1";
 const PID_FILE = "/tmp/vibedrop.pid";
@@ -190,6 +194,18 @@ function removeHooks() {
 
 /** Clean up everything on exit */
 function cleanup() {
+  // Tell all connected clients to close (triggers browser tab close)
+  if (_wss) {
+    for (const ws of _wss.clients) {
+      try { ws.send(JSON.stringify({ type: "shutdown" })); } catch {}
+      try { ws.close(); } catch {}
+    }
+    try { _wss.close(); } catch {}
+  }
+  // Close HTTP server so process can exit
+  if (_server) {
+    try { _server.close(); } catch {}
+  }
   removePidFile();
   removeFlagFile();
   removeHooks();
@@ -293,7 +309,7 @@ function startBridge() {
   }
 
   // HTTP
-  const server = createServer((req, res) => {
+  const server = (_server = createServer((req, res) => {
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
     res.setHeader("Access-Control-Allow-Headers", "Content-Type");
@@ -342,10 +358,10 @@ function startBridge() {
 
     res.writeHead(404);
     res.end("Not found");
-  });
+  }));
 
   // WebSocket
-  const wss = new WebSocketServer({ server });
+  const wss = (_wss = new WebSocketServer({ server }));
 
   wss.on("connection", (ws, req) => {
     ws._addr = req.socket.remoteAddress;
@@ -501,6 +517,9 @@ if (command === "setup") {
     log(`${c.dim}3. Video chat activates when Claude thinks${c.reset}`);
     console.log();
     log(`${c.dim}Press Ctrl+C to stop (hooks auto-removed)${c.reset}`);
+    console.log();
+    log(`${c.orange}${c.bold}⚡ Restart your Claude session${c.reset} for hooks to take effect.`);
+    log(`${c.dim}Close the current Claude Code or Desktop session and start a new one.${c.reset}`);
     console.log();
   }, 500);
 }
